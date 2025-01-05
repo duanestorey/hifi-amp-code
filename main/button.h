@@ -7,14 +7,14 @@
 
 class Button {
 public:
-    Button( uint8_t gpio, Queue *queue, uint16_t debounceMs = BUTTON_DEBOUNCE_TIME );
+    Button( uint8_t gpio, QueuePtr queue, uint16_t debounceMs = BUTTON_DEBOUNCE_TIME );
     void handleInterrupt();
     void tick();
 protected:
     uint8_t mGpio;
     uint16_t mDebounceTime;
 
-    Queue *mQueue;
+    QueuePtr mQueue;
 
     bool mThinking;
     uint32_t mThinkingStartTime;

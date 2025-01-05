@@ -2,6 +2,7 @@
 #define __QUEUE_H__
 
 #include <stdio.h>
+#include <memory>
 
 #include "message.h"
 #include "freertos/FreeRTOS.h"
@@ -27,5 +28,7 @@ public:
 protected:
     QueueHandle_t mQueueHandle;
 };
+
+typedef std::shared_ptr<Queue> QueuePtr;
 
 #endif

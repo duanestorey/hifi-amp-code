@@ -7,14 +7,14 @@ Timer::Timer() : mCurrentEventID( 1 ) {
 }
 
 uint32_t
-Timer::setTimer( uint32_t timeout, Queue &queue, bool recurring ) {
+Timer::setTimer( uint32_t timeout, QueuePtr queue, bool recurring ) {
     TimerInfo timerInfo;
     uint32_t futureTime = getCurrentTimeInMS() + timeout;
     
     ScopedLock lock( mMutex );
 
     timerInfo.mEventID = mCurrentEventID;
-    timerInfo.mQueue = &queue;
+    timerInfo.mQueue = queue;
     timerInfo.mEventTime = futureTime;
     timerInfo.mTimeout = timeout;
     timerInfo.mRecurring = recurring;

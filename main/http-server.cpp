@@ -23,7 +23,7 @@
 #define HTTPD_307 "307 Temporary Redirect"
 #define HTTPD_404 "404 Not Found"
 
-HTTP_Server::HTTP_Server( Queue *queue ) : mQueue( queue ), mServerHandle( 0 ) {
+HTTP_Server::HTTP_Server( QueuePtr queue ) : mQueue( queue ), mServerHandle( 0 ) {
 
 }
 

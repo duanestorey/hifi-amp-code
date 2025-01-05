@@ -2,7 +2,7 @@
 #include "pins.h"
 #include "debug.h"
 
-Button::Button( uint8_t gpio, Queue *queue, uint16_t debounceMs ) : mGpio( gpio ), mDebounceTime( debounceMs ), mQueue( queue ), mThinking ( false ), mThinkingStartTime( 0 ), mPressed( false ) {
+Button::Button( uint8_t gpio, QueuePtr queue, uint16_t debounceMs ) : mGpio( gpio ), mDebounceTime( debounceMs ), mQueue( queue ), mThinking ( false ), mThinkingStartTime( 0 ), mPressed( false ) {
 
 }
 

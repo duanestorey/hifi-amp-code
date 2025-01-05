@@ -34,9 +34,14 @@
 #include "netdb.h"
 #include "mdns.h"
 
-Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mDigitalAudioStarted( false ), mDisplayQueue( 3 ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ), mLCD( 0 ),
+Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mDigitalAudioStarted( false ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ), mLCD( 0 ),
     mDAC( 0 ), mChannelSel( 0 ), mWebServer( 0 ), mSPDIF( 0 ), mMicroprocessorTemp( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
     mPowerButton( 0 ), mVolumeButton( 0 ), mInputButton( 0 ) {
+
+    mDisplayQueue = QueuePtr( new Queue() );
+    mAudioQueue = QueuePtr( new Queue() );
+    mRadioQueue = QueuePtr( new Queue() );
+    mAmplifierQueue = QueuePtr( new Queue() );
 }
 
 void 
@@ -85,7 +90,7 @@ Amplifier::updateConnectedStatus( bool connected, bool doActualUpdate ) {
 
 void
 Amplifier::_handleIRInterrupt( const rmt_rx_done_event_data_t *edata ) {
-    mAmplifierQueue.add( Message::MSG_IR_CODE_RECEIVER, (uint32_t)edata );
+    mAmplifierQueue->addFromISR( Message::MSG_IR_CODE_RECEIVER, (uint32_t)edata );
 }
 
 bool
@@ -171,18 +176,18 @@ Amplifier::init() {
     mAudioTimerID = mTimer.setTimer( 1000, mAudioQueue, true );
 
     // Set up buttons
-    mPowerButton = new Button( PIN_BUTTON_POWER, &mAmplifierQueue );
-    mVolumeButton = new Button( PIN_BUTTON_VOLUME, &mAmplifierQueue );
-    mInputButton = new Button( PIN_BUTTON_INPUT, &mAmplifierQueue );
+    mPowerButton = new Button( PIN_BUTTON_POWER, mAmplifierQueue );
+    mVolumeButton = new Button( PIN_BUTTON_VOLUME, mAmplifierQueue );
+    mInputButton = new Button( PIN_BUTTON_INPUT, mAmplifierQueue );
 
-    mWebServer = new HTTP_Server( &mAmplifierQueue );
+    mWebServer = new HTTP_Server( mAmplifierQueue );
 
     setupRemoteReceiver();
 }
 
 void 
 Amplifier::asyncUpdateDisplay() {
-    mDisplayQueue.add( Message::MSG_DISPLAY_SHOULD_UPDATE );
+    mDisplayQueue->add( Message::MSG_DISPLAY_SHOULD_UPDATE );
 }
 
 void 
@@ -194,10 +199,10 @@ Amplifier::handleDisplayThread() {
     mLCD->begin();
 
     // Let the audio task know the display is up and ready, should it care
-    mAmplifierQueue.add( Message::MSG_DISPLAY_DONE_INIT );
+    mAmplifierQueue->add( Message::MSG_DISPLAY_DONE_INIT );
 
     while( true ) {
-        while ( mDisplayQueue.waitForMessage( msg, 10 ) ) {
+        while ( mDisplayQueue->waitForMessage( msg, 10 ) ) {
             AMP_DEBUG_I( "Processing Display Queue Message" );
 
             switch( msg.mMessageType ) {
@@ -357,7 +362,7 @@ Amplifier::updateInput( uint8_t newInput ) {
         }
     }
 
-    mAudioQueue.add( Message::MSG_INPUT_SET, mState.mInput );
+    mAudioQueue->add( Message::MSG_INPUT_SET, mState.mInput );
 
     asyncUpdateDisplay();
 }
@@ -380,11 +385,11 @@ Amplifier::_handleNecRemoteCommand( uint8_t address, uint8_t command ) {
             switch( command ) {
                 case 2: 
                     // volume up
-                    mAmplifierQueue.add( Message::MSG_VOLUME_UP );
+                    mAmplifierQueue->add( Message::MSG_VOLUME_UP );
                     break;
                 case 3:
                     // volume down
-                    mAmplifierQueue.add( Message::MSG_VOLUME_DOWN );
+                    mAmplifierQueue->add( Message::MSG_VOLUME_DOWN );
                     break;
             }
             break;
@@ -397,7 +402,7 @@ Amplifier::handleAmplifierThread() {
 
     Message msg;
     while( true ) {
-        while ( mAmplifierQueue.waitForMessage( msg, 20 ) ) {
+        while ( mAmplifierQueue->waitForMessage( msg, 20 ) ) {
            // AMP_DEBUG_I( "Processing Amplifier Queue Message" );
 
             switch( msg.mMessageType ) {
@@ -445,7 +450,7 @@ Amplifier::handleAmplifierThread() {
 
                     gpio_set_level( PIN_RELAY, 0 );
                     mLCD->enableBacklight( false );
-                    mAudioQueue.add( Message::MSG_AUDIO_SHUTDOWN );
+                    mAudioQueue->add( Message::MSG_AUDIO_SHUTDOWN );
 
                     break;
                 case Message::MSG_POWERON:
@@ -457,7 +462,7 @@ Amplifier::handleAmplifierThread() {
                     gpio_set_level( PIN_RELAY, 1 );
                     taskDelayInMs( 1000 );
 
-                    mAudioQueue.add( Message::MSG_AUDIO_RESTART );
+                    mAudioQueue->add( Message::MSG_AUDIO_RESTART );
                     
                     break;
                 case Message::MSG_DISPLAY_SHOULD_UPDATE:
@@ -465,7 +470,7 @@ Amplifier::handleAmplifierThread() {
                     break;
                 case Message::MSG_DISPLAY_DONE_INIT:
                     // We are done display startup, let's start wifi now
-                    mRadioQueue.add( Message::MSG_WIFI_INIT );
+                    mRadioQueue->add( Message::MSG_WIFI_INIT );
                     break;
                 case Message::MSG_TIMER:
                     if ( msg.mParam == mTimerID ) {
@@ -495,7 +500,7 @@ Amplifier::handleAmplifierThread() {
                         
                         asyncUpdateDisplay();
 
-                        mAudioQueue.add( Message::MSG_VOLUME_SET, mState.mCurrentAttenuation );
+                        mAudioQueue->add( Message::MSG_VOLUME_SET, mState.mCurrentAttenuation );
                     }
                     break;
                 case Message::MSG_VOLUME_DOWN:
@@ -513,7 +518,7 @@ Amplifier::handleAmplifierThread() {
 
                         asyncUpdateDisplay();
 
-                        mAudioQueue.add( Message::MSG_VOLUME_SET, mState.mCurrentAttenuation );
+                        mAudioQueue->add( Message::MSG_VOLUME_SET, mState.mCurrentAttenuation );
                     }  
                     break;
                 case Message::MSG_INPUT_UP:
@@ -614,9 +619,9 @@ Amplifier::handlePowerButtonPress() {
     AMP_DEBUG_I( "Power button pressed" );
 
     if ( mPoweredOn ) {
-        mAmplifierQueue.add( Message::MSG_POWEROFF );
+        mAmplifierQueue->add( Message::MSG_POWEROFF );
     } else {
-        mAmplifierQueue.add( Message::MSG_POWERON );
+        mAmplifierQueue->add( Message::MSG_POWERON );
     }
 }
 
@@ -629,7 +634,7 @@ Amplifier::handleInputButtonPress() {
 
         mState.mEnhancement = !mState.mEnhancement;
 
-        mAudioQueue.add( Message::MSG_AUDIO_SET_ENHANCEMENT, mState.mEnhancement );
+        mAudioQueue->add( Message::MSG_AUDIO_SET_ENHANCEMENT, mState.mEnhancement );
     }
 }
 
@@ -747,7 +752,7 @@ Amplifier::handleAudioThread() {
 
     Message msg;
     while( true ) {
-        while ( mAudioQueue.waitForMessage( msg, 5 ) ) {
+        while ( mAudioQueue->waitForMessage( msg, 5 ) ) {
             switch( msg.mMessageType ) {
                 case Message::MSG_AUDIO_RESTART:
                     {
@@ -872,7 +877,7 @@ static void wifi_event_handler( void *event_handler_arg, esp_event_base_t event_
 
 void
 Amplifier::_handleWifiCallback( int32_t event_id ) {
-    mRadioQueue.add( Message::MSG_WIFI_UPDATE, event_id );
+    mRadioQueue->add( Message::MSG_WIFI_UPDATE, event_id );
 }
 
 void
@@ -998,7 +1003,7 @@ Amplifier::handleRadioThread() {
             }
         }
 
-        while ( mRadioQueue.waitForMessage( msg, 10 ) ) {
+        while ( mRadioQueue->waitForMessage( msg, 10 ) ) {
             AMP_DEBUG_I( "Processing Radio Queue Message" );
             switch( msg.mMessageType ) {
                 case Message::MSG_WIFI_INIT:
@@ -1058,7 +1063,7 @@ Input_Button_Encoder_ISR( void *arg ) {
 
 void 
 Amplifier::_handleDecoderISR() {
-    mAmplifierQueue.addFromISR( Message::MSG_DECODER_IRQ );
+    mAmplifierQueue->addFromISR( Message::MSG_DECODER_IRQ );
 }
 
 void 
@@ -1087,10 +1092,10 @@ Amplifier::_handleVolumeButtonEncoderISR() {
     ENCODER_DIR direction = mVolumeEncoder.process();
     switch( direction ) {
         case ENCODER_FORWARD:
-            mAmplifierQueue.addFromISR( Message::MSG_VOLUME_UP );
+            mAmplifierQueue->addFromISR( Message::MSG_VOLUME_UP );
             break;
         case ENCODER_BACKWARD:
-            mAmplifierQueue.addFromISR( Message::MSG_VOLUME_DOWN );
+            mAmplifierQueue->addFromISR( Message::MSG_VOLUME_DOWN );
             break;
         default:
             break;
@@ -1102,10 +1107,10 @@ Amplifier::_handleInputButtonEncoderISR() {
     ENCODER_DIR direction = mInputEncoder.process();
     switch( direction ) {
         case ENCODER_FORWARD:
-            mAmplifierQueue.addFromISR( Message::MSG_INPUT_UP );
+            mAmplifierQueue->addFromISR( Message::MSG_INPUT_UP );
             break;
         case ENCODER_BACKWARD:
-            mAmplifierQueue.addFromISR( Message::MSG_INPUT_DOWN );
+            mAmplifierQueue->addFromISR( Message::MSG_INPUT_DOWN );
             break;
         default:
             break;

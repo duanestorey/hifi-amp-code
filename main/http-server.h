@@ -7,7 +7,7 @@
 
 class HTTP_Server {
 public:
-    HTTP_Server( Queue *queue );
+    HTTP_Server( QueuePtr queue );
 
     enum {
         SERVER_MAIN,
@@ -32,7 +32,7 @@ public:
     esp_err_t handleResponse( uint8_t requestType, httpd_req_t *req );
     
 protected:
-    Queue *mQueue;
+    QueuePtr mQueue;
     httpd_handle_t mServerHandle;
     std::string mMainPage;
 };

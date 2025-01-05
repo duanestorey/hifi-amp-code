@@ -1,5 +1,5 @@
 #ifndef __DAC_PCM5142_H__
-#define __DAC_PCM5142_H__
+#define __DAC_PCM51X4_H__
 
 #include "abstract/dac.h"
 #include "i2c-bus.h"

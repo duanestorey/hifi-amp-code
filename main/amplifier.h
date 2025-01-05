@@ -53,10 +53,17 @@ protected:
 
     Timer mTimer;
 
+    QueuePtr mDisplayQueue;
+    QueuePtr mAudioQueue;
+    QueuePtr mRadioQueue;
+    QueuePtr mAmplifierQueue;
+
+    /*
     Queue mDisplayQueue;
     Queue mAudioQueue;
     Queue mRadioQueue;
     Queue mAmplifierQueue;
+    */
 
     uint32_t mTimerID;
     uint32_t mButtonTimerID;
