@@ -1115,15 +1115,15 @@ Amplifier::_handleInputButtonEncoderISR() {
 void 
 Amplifier::setupPWM() {
     ledc_timer_config_t backlight_config = {};
-    backlight_config.speed_mode         = LEDC_HIGH_SPEED_MODE;
+    backlight_config.speed_mode         = LEDC_LOW_SPEED_MODE;
     backlight_config.duty_resolution    = LEDC_TIMER_10_BIT;
     backlight_config.timer_num          = LEDC_TIMER_0;
     backlight_config.freq_hz            = 200;
-    backlight_config.clk_cfg            = LEDC_USE_REF_TICK;
+    backlight_config.clk_cfg            = LEDC_USE_RC_FAST_CLK;
 
     ledc_channel_config_t ledc_channel = {};
     ledc_channel.gpio_num   = PIN_LED_FRONT_STANDBY;
-    ledc_channel.speed_mode = LEDC_HIGH_SPEED_MODE;
+    ledc_channel.speed_mode = LEDC_LOW_SPEED_MODE;
     ledc_channel.channel    = LEDC_CHANNEL_0;
     ledc_channel.intr_type  = LEDC_INTR_DISABLE;
     ledc_channel.timer_sel  = LEDC_TIMER_0;
@@ -1134,11 +1134,11 @@ Amplifier::setupPWM() {
     ledc_timer_config( &backlight_config );
     ledc_channel_config( &ledc_channel );
     
-    ledc_set_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 50 );
-	ledc_update_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0 );
+    ledc_set_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 50 );
+	ledc_update_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0 );
 
     ledc_channel.gpio_num   = PIN_LED_ACTIVE;
-    ledc_channel.speed_mode = LEDC_HIGH_SPEED_MODE;
+    ledc_channel.speed_mode = LEDC_LOW_SPEED_MODE;
     ledc_channel.channel    = LEDC_CHANNEL_1;
     ledc_channel.intr_type  = LEDC_INTR_DISABLE;
     ledc_channel.timer_sel  = LEDC_TIMER_0;
@@ -1148,18 +1148,18 @@ Amplifier::setupPWM() {
 
     ledc_channel_config( &ledc_channel );
 
-    ledc_set_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1, 1023 );
-	ledc_update_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1 );
+    ledc_set_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 1023 );
+	ledc_update_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1 );
 }
 
 void 
 Amplifier::activateButtonLight( bool activate ) {
     if ( activate ) {
-        ledc_set_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1, 700 );
-	    ledc_update_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1 );
+        ledc_set_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 700 );
+	    ledc_update_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1 );
     } else {
-        ledc_set_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1, 0 );
-	    ledc_update_duty( LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1 );
+        ledc_set_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 0 );
+	    ledc_update_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1 );
     }
 
 }

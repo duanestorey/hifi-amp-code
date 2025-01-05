@@ -9,8 +9,8 @@
 #include "mutex.h"
 #include "i2c-bus.h"
 #include "lcd.h"
-#include "dac.h"
-#include "channelsel.h"
+#include "abstract/dac.h"
+#include "abstract/channel-sel.h"
 
 #include "tmp100.h"
 #include "encoder.h"

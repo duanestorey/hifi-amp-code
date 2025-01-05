@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "channelsel.h"
+#include "abstract/channel-sel.h"
 
 class AmplifierState {
 public:

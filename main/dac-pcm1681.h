@@ -1,7 +1,7 @@
 #ifndef __DAC_PCM1681_H__
 #define __DAC_PCM1681_H__
 
-#include "dac.h"
+#include "abstract/dac.h"
 #include "i2c-bus.h"
 
 class DAC_PCM1681 : public DAC {

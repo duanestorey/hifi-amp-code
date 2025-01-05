@@ -39,7 +39,7 @@
 #define         AX2358_MIX_6DB_ON           0b11000010
 #define         AX2358_MIX_6DB_OFF          0b11000011
 
-#include "channelsel.h"
+#include "abstract/channel-sel.h"
 #include "i2c-bus.h"
 
 class ChannelSel_AX2358 : public ChannelSel {
