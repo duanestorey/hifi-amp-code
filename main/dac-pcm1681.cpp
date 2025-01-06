@@ -10,7 +10,7 @@
 
 #include "tmp100.h"
 
-DAC_PCM1681::DAC_PCM1681( uint8_t address, I2CBUS *bus ) : mAddress( address ), mI2C( bus ), mEnabled( false ) {
+DAC_PCM1681::DAC_PCM1681( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mI2C( bus ), mEnabled( false ) {
 }
 
 DAC_PCM1681::~DAC_PCM1681() {

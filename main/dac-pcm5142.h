@@ -25,7 +25,7 @@ public:
         
     } PCM5142_PAGE_2;
     
-    DAC_PCM5142( uint8_t address, I2CBUS *bus );
+    DAC_PCM5142( uint8_t address, I2CBUSPtr bus );
     virtual ~DAC_PCM5142();
 
 	// the name for this DAC
@@ -39,7 +39,7 @@ public:
     virtual void setPrecision( uint8_t precision );
 protected:
     uint8_t mAddress;
-    I2CBUS *mI2C;
+    I2CBUSPtr mI2C;
     bool mEnabled;
     uint8_t mCurrentPage;
     uint8_t mPrecision;

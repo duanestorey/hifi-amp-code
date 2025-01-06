@@ -2,6 +2,7 @@
 #define __BUTTON_H__
 
 #include "queue.h"
+#include <memory>
 
 #define BUTTON_DEBOUNCE_TIME    25
 
@@ -25,5 +26,7 @@ private:
     void pressed();
     void unpressed();
 };
+
+typedef std::shared_ptr<Button> ButtonPtr;
 
 #endif

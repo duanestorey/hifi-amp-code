@@ -3,7 +3,7 @@
 #include "debug.h"
 #include <string.h>
 
-LCD::LCD( uint8_t addr, I2CBUS *bus ) : mAddr( addr ), mI2C( bus ), mBacklight( BACKLIGHT_ON ) {
+LCD::LCD( uint8_t addr, I2CBUSPtr bus ) : mAddr( addr ), mI2C( bus ), mBacklight( BACKLIGHT_ON ) {
 	mRowOffsets[0] = 0;
 	mRowOffsets[1] = 0x40;
 	mRowOffsets[2] = 20;

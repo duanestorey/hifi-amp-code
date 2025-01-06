@@ -1,9 +1,9 @@
 #ifndef __I2CBUS_H__
 #define __I2CBUS_H__
 
-#define I2C_MS_TO_WAIT      50
-
 #include "mutex.h"
+#include "config.h"
+#include <memory>
 
 class I2CBUS {
 public:
@@ -17,5 +17,7 @@ public:
 private:
     Mutex mMutex;
 };
+
+typedef std::shared_ptr<I2CBUS> I2CBUSPtr;
 
 #endif

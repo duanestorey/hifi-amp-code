@@ -11,8 +11,7 @@
 #include <stack>
 #include <map>
 #include <list>
-
-class TimerObserver;
+#include <memory>
 
 struct TimerInfo {
     uint32_t mEventID;
@@ -44,9 +43,7 @@ private:
     uint32_t getCurrentTimeInMS() const;
 };
 
-class TimerObserver {
-public:
-    virtual void onTimer( uint32_t eventID ) = 0;
-};
+typedef std::shared_ptr<Timer> TimerPtr;
+
 
 #endif

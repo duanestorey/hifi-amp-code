@@ -2,6 +2,7 @@
 #define __DECODER_H__
 
 #include <string>
+#include <memory>
 
 class DAC {
 public:
@@ -34,9 +35,10 @@ public:
     virtual void setFormat( uint8_t format ) = 0;
     virtual void enable( bool state ) = 0;
 	virtual void setPrecision( uint8_t precision ) = 0;
-
 	virtual void setChannelAttenuation( int channel, int att ) = 0;
 	virtual void setAttenuation( int att ) = 0;
 };
+
+typedef std::shared_ptr<DAC> DACPtr;
 
 #endif

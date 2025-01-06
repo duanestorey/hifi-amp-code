@@ -32,7 +32,7 @@ public:
 		LCD_COMMAND_SETDDRAMADDR = 0x80
 	};
 
-    LCD( uint8_t addr, I2CBUS *bus );
+    LCD( uint8_t addr, I2CBUSPtr bus );
 
     void sendCommand( uint8_t command );
 	void enableBacklight( bool enable = true );
@@ -47,7 +47,7 @@ public:
 	void writeLine( uint8_t line, std::string s );
 protected:
     uint8_t mAddr;
-    I2CBUS *mI2C;
+    I2CBUSPtr mI2C;
 	uint8_t mBacklight;
 	uint8_t mRowOffsets[4];
 

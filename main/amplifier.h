@@ -18,6 +18,8 @@
 #include "http-server.h"
 #include "cs8416.h"
 #include "driver/rmt_rx.h"
+#include "pin-mcp-manager.h"
+#include "volume-controller.h"
 
 class Amplifier {
 public:
@@ -51,7 +53,7 @@ protected:
     bool mPoweredOn;
     bool mDigitalAudioStarted;
 
-    Timer mTimer;
+    TimerPtr mTimer;
 
     QueuePtr mDisplayQueue;
     QueuePtr mAudioQueue;
@@ -70,7 +72,8 @@ protected:
     uint32_t mReconnectTimerID;
 
     AmplifierState mState;
-    I2CBUS mI2C;
+    I2CBUSPtr mI2C;
+
     LCD *mLCD;
 
     DAC *mDAC;
@@ -89,12 +92,15 @@ protected:
     bool mPendingVolumeChange;
     uint32_t mPendingVolume;
 
-    Button *mPowerButton;
-    Button *mVolumeButton;
-    Button *mInputButton;
+    ButtonPtr mPowerButton;
+    ButtonPtr mVolumeButton;
+    ButtonPtr mInputButton;
 
     uint8_t mIRBuffer[ 218 ];
     rmt_channel_handle_t mIRChannel;
+
+    PinMcpManagerPtr mMcpPinManager;
+    VolumePtr mMasterVolume;
 
 private:
     void configurePins();

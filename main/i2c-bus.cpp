@@ -3,13 +3,13 @@
 #include "driver/i2c.h"
 #include "sdkconfig.h"
 #include "debug.h"
+#include "config.h"
 
 #define I2C_MASTER_TX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE   0  
 #define I2C_MASTER_NUM              0    
 #define I2C_MASTER_SDA_IO           21
 #define I2C_MASTER_SCL_IO           22
-#define I2C_MASTER_FREQ_HZ          100000
 
 #define I2C_WRITE_REQ               0
 #define I2C_READ_REQ                0
@@ -18,7 +18,7 @@
 #define NACK_VAL                    0x1             
 
 I2CBUS::I2CBUS() {  
-    AMP_DEBUG_I( "Stargting I2C bus" );
+    AMP_DEBUG_I( "Starting I2C bus" );
     i2c_config_t conf = {};
 
     conf.mode = I2C_MODE_MASTER;

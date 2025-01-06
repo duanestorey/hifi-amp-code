@@ -44,7 +44,7 @@
 
 class ChannelSel_AX2358 : public ChannelSel {
 public:
-    ChannelSel_AX2358( uint8_t addr, I2CBUS *bus ) : mAddress( addr ), mI2C ( bus ), mVolume( 20 ) {}
+    ChannelSel_AX2358( uint8_t addr, I2CBUSPtr bus ) : mAddress( addr ), mI2C ( bus ), mVolume( 20 ) {}
     virtual void init();
     virtual void setInput( uint8_t input );
     virtual void mute( bool mute );
@@ -55,7 +55,7 @@ public:
     virtual bool setChannelAttenuation(  uint8_t channel, uint8_t att );
 protected:
     uint8_t mAddress;
-    I2CBUS *mI2C;
+    I2CBUSPtr mI2C;
 
     // 0 - 79
     uint8_t mVolume;

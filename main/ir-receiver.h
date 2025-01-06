@@ -3,6 +3,7 @@
 
 #include "queue.h"
 #include "pins.h"
+#include <memory>
 
 class IR_Receiver {
 public:
@@ -33,6 +34,8 @@ protected:
 };
 
 void IR_Receiver_Interrupt( void *arg  );
+
+typedef std::shared_ptr<IR_Receiver> IR_ReceiverPtr;
 
 #endif
 

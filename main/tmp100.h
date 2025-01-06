@@ -5,11 +5,11 @@
 
 class TMP100 {
 public:
-    TMP100( uint8_t address, I2CBUS *bus );
+    TMP100( uint8_t address, I2CBUSPtr bus );
     virtual float readTemperature();
 protected:
     uint8_t mAddress;
-    I2CBUS *mI2C;
+    I2CBUSPtr mI2C;
 };
 
 #endif

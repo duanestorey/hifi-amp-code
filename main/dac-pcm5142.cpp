@@ -1,7 +1,7 @@
 #include "dac-pcm5142.h"
 #include "debug.h"
 
-DAC_PCM5142::DAC_PCM5142( uint8_t address, I2CBUS *bus ) : mAddress( address ), mI2C( bus ), mCurrentPage( 255 ), mPrecision( DAC::PRECISION_24_BIT ), 
+DAC_PCM5142::DAC_PCM5142( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mI2C( bus ), mCurrentPage( 255 ), mPrecision( DAC::PRECISION_24_BIT ), 
     mFormat( DAC::FORMAT_I2S ), mDetectedSamplingRate( 0 ), mDetectedClkRatio( 0 ) {
 }
 

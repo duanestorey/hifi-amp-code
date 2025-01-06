@@ -42,6 +42,12 @@ Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mU
     mAudioQueue = QueuePtr( new Queue() );
     mRadioQueue = QueuePtr( new Queue() );
     mAmplifierQueue = QueuePtr( new Queue() );
+
+    mI2C = I2CBUSPtr( new I2CBUS() );
+    mTimer = TimerPtr( new Timer() );
+
+    mMcpPinManager = PinMcpManagerPtr( new PinMcpManager( mI2C ) );
+    mMasterVolume = VolumePtr( new VolumeController() );
 }
 
 void 
@@ -69,7 +75,6 @@ Amplifier::updateConnectedStatus( bool connected, bool doActualUpdate ) {
     }   
 
     if ( connected ) {
-
         esp_err_t err = mdns_init();
         if (err) {
             printf("MDNS Init failed: %d\n", err);
@@ -139,8 +144,8 @@ Amplifier::init() {
 
     activateButtonLight( true );
 
-    mTimerID = mTimer.setTimer( 60000, mAmplifierQueue, true );
-    mButtonTimerID = mTimer.setTimer( 10, mAmplifierQueue, true );
+    mTimerID = mTimer->setTimer( 60000, mAmplifierQueue, true );
+    mButtonTimerID = mTimer->setTimer( 10, mAmplifierQueue, true );
 
     // I2C current map
     /*
@@ -163,22 +168,23 @@ Amplifier::init() {
 
     */
 
-    mLCD = new LCD( 0x27, &mI2C );
-    mMicroprocessorTemp = new TMP100( 0x48, &mI2C );
-    mChannelSel = new ChannelSel_AX2358( 0x4a, &mI2C );
+    mLCD = new LCD( 0x27, mI2C );
+    mMicroprocessorTemp = new TMP100( 0x48, mI2C );
+    mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
 
     // PCM5142
-    mDAC = new DAC_PCM5142( 0x4c, &mI2C );
+    mDAC = new DAC_PCM5142( 0x4c, mI2C );
 
     // CS8416
-    mSPDIF = new CS8416( 0x10, &mI2C );
+    mSPDIF = new CS8416( 0x10, mI2C );
 
-    mAudioTimerID = mTimer.setTimer( 1000, mAudioQueue, true );
+    // Set up timers
+    mAudioTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
 
     // Set up buttons
-    mPowerButton = new Button( PIN_BUTTON_POWER, mAmplifierQueue );
-    mVolumeButton = new Button( PIN_BUTTON_VOLUME, mAmplifierQueue );
-    mInputButton = new Button( PIN_BUTTON_INPUT, mAmplifierQueue );
+    mPowerButton = ButtonPtr( new Button( PIN_BUTTON_POWER, mAmplifierQueue ) );
+    mVolumeButton = ButtonPtr(new Button( PIN_BUTTON_VOLUME, mAmplifierQueue ) );
+    mInputButton = ButtonPtr( new Button( PIN_BUTTON_INPUT, mAmplifierQueue ) );
 
     mWebServer = new HTTP_Server( mAmplifierQueue );
 
@@ -337,14 +343,13 @@ Amplifier::changeAmplifierState( uint8_t newState ) {
     asyncUpdateDisplay();
 }
 
-
 void 
 Amplifier::handleTimerThread() {
     AMP_DEBUG_I( "Starting Timer Thread on Core %d", xPortGetCoreID() );
     while( true ) {
-        mTimer.processTick();
+        mTimer->processTick();
 
-        taskDelayInMs( 10 );
+        taskDelayInMs( 5 );
     } 
 }
 
@@ -655,7 +660,7 @@ Amplifier::startDigitalAudio() {
     gpio_set_level( PIN_CS8416_RESET, 1 );
     taskDelayInMs( 10 );
 
-    mSpdifTimerID = mTimer.setTimer( 1000, mAudioQueue, true );
+    mSpdifTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
 
     // Initialize SPDIF stream, but don't run
 
@@ -688,7 +693,7 @@ void
 Amplifier::stopDigitalAudio() {
     AMP_DEBUG_I( "Stopping SPDIF/DAC" );
 
-    mTimer.cancelTimer( mSpdifTimerID );
+    mTimer->cancelTimer( mSpdifTimerID );
     mSpdifTimerID = 0;
 
     mDAC->enable( false );
@@ -740,7 +745,7 @@ Amplifier::handleAudioThread() {
         mChannelSel->setInput( state.mInput ); 
     }
 
-    mI2C.scanBus();
+    mI2C->scanBus();
 
     asyncUpdateDisplay();
 
@@ -896,7 +901,7 @@ Amplifier::handleWifiCallback( int32_t event_id ) {
             AMP_DEBUG_I( "Wifi Disconnected" );
             if ( mWifiEnabled ) {
                 AMP_DEBUG_I( "Setting Reconnection Timer" );
-                mReconnectTimerID = mTimer.setTimer( 10000, mRadioQueue, false );
+                mReconnectTimerID = mTimer->setTimer( 10000, mRadioQueue, false );
             }
             updateConnectedStatus( false );
             break;

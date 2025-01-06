@@ -1,7 +1,7 @@
 #include "tmp100.h"
 #include "debug.h"
 
-TMP100::TMP100( uint8_t address, I2CBUS *bus ) : mAddress( address ), mI2C( bus ) {
+TMP100::TMP100( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mI2C( bus ) {
     mI2C->writeRegisterByte( mAddress, 1, 0x60 );
 }
 

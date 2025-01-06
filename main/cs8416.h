@@ -48,7 +48,7 @@ public:
         SPDIF_FORMAT_DTS_CD =   0b00001000
     } SPDIF_FORMATS;
 
-    CS8416( uint8_t address, I2CBUS *bus ) : mAddress( address ), mBus( bus ), mRunning( false ), mInput( SPDIF_INPUT_1 ), mCurrentFormat( 0 ), mChipVersion( 0 ) {}
+    CS8416( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mBus( bus ), mRunning( false ), mInput( SPDIF_INPUT_1 ), mCurrentFormat( 0 ), mChipVersion( 0 ) {}
 
     void init();
     void run( bool enabled = true );
@@ -72,7 +72,7 @@ private:
     void updateRunCommand();
 protected:
     uint8_t mAddress;
-    I2CBUS *mBus;
+    I2CBUSPtr mBus;
     bool mRunning;
     uint8_t mInput;
     uint8_t mCurrentFormat;
