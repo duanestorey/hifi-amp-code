@@ -1,7 +1,7 @@
 #include "pin-mcp.h"
 #include "pin-mcp-manager.h"
 
-PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) : mPin( pin ), mPinManager( pinManager ) {
+PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) : Pin( direction, pulldown, pullup, interrupt), mPin( pin ), mPinManager( pinManager ) {
     config( direction, pulldown, pullup, interrupt );
 }
 
@@ -9,7 +9,7 @@ PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8
 void 
 PinMcp::config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) {
     if ( mPinManager ) {
-    
+        mPinManager->updateConfig();
     }
 }
 

@@ -46,7 +46,7 @@ Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mU
     mI2C = I2CBUSPtr( new I2CBUS() );
     mTimer = TimerPtr( new Timer() );
 
-    mMcpPinManager = PinMcpManagerPtr( new PinMcpManager( mI2C ) );
+    mMcpPinManager = PinMcpManagerPtr( new PinMcpManager( mI2C, 0x10 ) );
     mMasterVolume = VolumePtr( new VolumeController() );
 }
 

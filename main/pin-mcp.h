@@ -16,14 +16,14 @@ class PinMcp : public Pin {
             PIN_A5 = 0x05,
             PIN_A6 = 0x06,
             PIN_A7 = 0x07,
-            PIN_B0 = 0x08,
-            PIN_B1 = 0x09,
-            PIN_B2 = 0x0a,
-            PIN_B3 = 0x0b,
-            PIN_B4 = 0x0c,
-            PIN_B5 = 0x0d,
-            PIN_B6 = 0x0e,
-            PIN_B7 = 0x0f
+            PIN_B0 = 0x10,
+            PIN_B1 = 0x11,
+            PIN_B2 = 0x12,
+            PIN_B3 = 0x13,
+            PIN_B4 = 0x14,
+            PIN_B5 = 0x15,
+            PIN_B6 = 0x16,
+            PIN_B7 = 0x17
         };
 
         PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE );

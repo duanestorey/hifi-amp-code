@@ -1,6 +1,6 @@
 #include "pin-esp32.h"
 
-PinESP32::PinESP32( gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt  ) : mPin( pin ) {
+PinESP32::PinESP32( gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt  ) : Pin( direction, pulldown, pullup, interrupt), mPin( pin ) {
     config( direction, pulldown, pullup, interrupt );
 }
 

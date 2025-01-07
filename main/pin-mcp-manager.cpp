@@ -1,30 +1,97 @@
 #include "pin-mcp-manager.h"
 #include <memory.h>
 
-PinMcpManager::PinMcpManager( I2CBUSPtr bus ) : mBus( bus ) {
-    memset( mPins, 0, sizeof( PinMcp *) * ( PinMcp::PIN_B7 + 1 ) );
-}
-
-void 
-PinMcpManager::registerPin( PinMcp *pin ) {
-    mPins[ pin->getPinID() ] = pin;
+PinMcpManager::PinMcpManager( I2CBUSPtr bus, uint8_t addr ) : mBus( bus ), mAddr( addr ) {
 }
 
 uint8_t 
 PinMcpManager::getState( uint8_t pin ) {
-    uint8_t state = 0;
+    uint8_t isSet = Pin::PIN_STATE_LOW;;
+    uint8_t portState = 0;
 
-    return state;
+    if ( isPortA( pin ) ) {
+        mBus->readRegisterByte( mAddr, 0x12, portState );
+    } else {
+        mBus->readRegisterByte( mAddr, 0x13, portState );
+    }
+   
+    if ( portState ) {
+        if ( ( portState & ( 1 << ( ( pin & 0x0f ) - 1 ) ) ) > 0 ) {
+            isSet = Pin::PIN_STATE_HIGH;
+        }
+    }
+
+    return isSet;
 }
 
 void 
 PinMcpManager::setState( uint8_t pin, uint8_t state ) {
-    // update state here
+    uint8_t portState = 0;
+
+    if ( isPortA( pin ) ) {
+        mBus->readRegisterByte( mAddr, 0x12, portState );
+    } else {
+        mBus->readRegisterByte( mAddr, 0x13, portState );
+    }
+   
+    uint8_t pinValue = ( 1 << ( ( pin & 0x0f ) - 1 ) );
+
+    if ( state == Pin::PIN_STATE_LOW ) {
+        portState = portState & ~pinValue;
+    } else if ( state == Pin::PIN_STATE_HIGH ) {
+        portState = portState | pinValue;
+    }
+
+    if ( isPortA( pin ) ) {
+        mBus->writeRegisterByte( mAddr, 0x12, portState );
+    } else {
+        mBus->writeRegisterByte( mAddr, 0x13, portState );
+    }
+}
+
+bool 
+PinMcpManager::isPortA( uint8_t pin ) {
+    return ( pin & 0x10 );
+}
+
+void
+PinMcpManager::updateConfig() {
+    uint8_t portADir = 0xff;
+    uint8_t portBDir = 0xff;
+    uint8_t pullupA = 0x00;
+    uint8_t pullupB = 0x00;
+
+    for ( PinMap::iterator i = mPinMap.begin(); i != mPinMap.end(); i++ ) {
+        if ( i->second->getDirection() == Pin::PIN_TYPE_OUTPUT ) {
+            uint8_t pin = ( 1 << ( ( i->second->getPinID() & 0x0f ) - 1 ) );
+
+            if ( isPortA( i->second->getPinID() ) ) {
+                portADir = portADir & ~pin;
+
+                if ( i->second->getPullup() == Pin::PIN_PULLUP_ENABLE ) {
+                    pullupA = pullupA | pin;
+                }
+            } else {
+                portBDir = portBDir & ~pin;
+
+                if ( i->second->getPullup() == Pin::PIN_PULLUP_ENABLE ) {
+                    pullupB = pullupB | pin;
+                }
+            }
+
+            mBus->writeRegisterByte( mAddr, 0x00, portADir );
+            mBus->writeRegisterByte( mAddr, 0x01, portBDir );
+            mBus->writeRegisterByte( mAddr, 0x0c, pullupA );
+            mBus->writeRegisterByte( mAddr, 0x0d, pullupB );
+        }
+    }
 }
 
 PinPtr 
 PinMcpManager::createPin( uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) {
     PinPtr newPtr = PinPtr( new PinMcp( this, pin, direction, pulldown, pullup, interrupt ) );
+
+    mPinMap[ pin ] = newPtr;
 
     return newPtr;
 }

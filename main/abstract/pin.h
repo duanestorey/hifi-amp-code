@@ -34,14 +34,19 @@ class Pin {
             PIN_STATE_HIGH
         };
 
+        Pin( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE );
         virtual bool operator==( const Pin& a ) { return a.getClass() == getClass() && a.getPinID() == getPinID(); }
         virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE ) = 0;
         virtual void setState( uint8_t state ) = 0;
         virtual uint8_t getState() const = 0;
+        virtual uint8_t getDirection() const { return mDir; }
+        virtual uint8_t getPullup() const { return mPullup; }
+        virtual uint8_t getPulldown() const { return mPulldown; }
+
         virtual std::string getClass() const = 0;
         virtual uint8_t getPinID() const = 0;
     protected:
-        uint8_t mType;
+        uint8_t mDir;
         uint8_t mPulldown;
         uint8_t mPullup;
         uint8_t mInt;
