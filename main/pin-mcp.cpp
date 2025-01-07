@@ -1,13 +1,19 @@
 #include "pin-mcp.h"
 #include "pin-mcp-manager.h"
 
-PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) : Pin( direction, pulldown, pullup, interrupt), mPin( pin ), mPinManager( pinManager ) {
-    config( direction, pulldown, pullup, interrupt );
+PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup ) : Pin( direction, pulldown, pullup ), mPin( pin ), mPinManager( pinManager ) {
+    config( direction, pulldown, pullup );
 }
 
+void 
+PinMcp::enableInterrupt( uint8_t interruptType, QueuePtr queue ) {
+    if ( interruptType != Pin::PIN_INT_DISABLE ) {
+        Pin::enableInterrupt( interruptType, queue );
+    }
+}
 
 void 
-PinMcp::config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) {
+PinMcp::config( uint8_t direction, uint8_t pulldown, uint8_t pullup ) {
     if ( mPinManager ) {
         mPinManager->updateConfig();
     }

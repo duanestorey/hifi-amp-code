@@ -17,10 +17,10 @@ public:
     virtual ~Queue();
 
     void add( Message msg );
-    void add( Message::MessageType msgType, uint32_t param = 0 ) { add( Message( msgType, param ) ); }
+    void add( Message::MessageType msgType, uint32_t param = 0, uint32_t param2 = 0 ) { add( Message( msgType, param, param2 ) ); }
 
     void addFromISR( Message msg );
-    void addFromISR( Message::MessageType msgType, uint32_t param = 0 ) { addFromISR( Message( msgType, param ) ); }
+    void addFromISR( Message::MessageType msgType, uint32_t param = 0, uint32_t param2 = 0 ) { addFromISR( Message( msgType, param, param2 ) ); }
 
     bool hasMessage();
     Message getMessage();

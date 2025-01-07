@@ -10,18 +10,22 @@ typedef std::map<uint8_t, PinPtr> PinMap;
 
 class PinMcpManager {
     public:
-        PinMcpManager( I2CBUSPtr bus, uint8_t addr );
+        PinMcpManager( I2CBUSPtr bus, uint8_t addr, QueuePtr queue );
         
         uint8_t getState( uint8_t pin );
         void setState( uint8_t pin, uint8_t state );
-        PinPtr createPin( uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = Pin::PIN_INT_DISABLE );
+        PinPtr createPin( uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup );
         void updateConfig();
+
+        void processPortAInterrupt();
+        void processPortBInterrupt();
     protected:
         I2CBUSPtr mBus;
         PinMap mPinMap;
         uint8_t mAddr;
 
         bool isPortA( uint8_t pin );
+        QueuePtr mInterruptQueue;
        
 };
 

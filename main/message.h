@@ -32,14 +32,19 @@ public:
         MSG_BUTTON_RELEASED,
         MSG_POWEROFF,
         MSG_POWERON,
-        MSG_IR_CODE_RECEIVER
+        MSG_IR_CODE_RECEIVER,
+        MSG_GPIO_INTERRUPT,
+        MSG_GPIO_MCP_PORTA,
+        MSG_GPIO_MCP_PORTB
     };
 
-    Message( MessageType t ) : mMessageType( t ), mParam( 0 ) {}
-    Message( MessageType t, uint32_t param ) : mMessageType( t ), mParam( param ) {}
+    Message( MessageType t ) : mMessageType( t ), mParam( 0 ), mParam2( 0 ) {}
+    Message( MessageType t, uint32_t param ) : mMessageType( t ), mParam( param ), mParam2( 0 ) {}
+    Message( MessageType t, uint32_t param, uint32_t param2 ) : mMessageType( t ), mParam( param ), mParam2( param2 ) {}
 
     MessageType mMessageType;
     uint32_t mParam;
+    uint32_t mParam2;
 };
 
 #endif

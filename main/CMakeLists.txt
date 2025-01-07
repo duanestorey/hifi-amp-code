@@ -27,6 +27,7 @@ set(COMPONENT_SRCS
     "pin-mcp.cpp"
     "pin-mcp-manager.cpp"
     "volume-controller.cpp"
+    "pin-manager.cpp"
 )
 set(COMPONENT_ADD_INCLUDEDIRS)
 

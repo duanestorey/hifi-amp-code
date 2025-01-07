@@ -2,12 +2,14 @@
 #define __PINESP32_H__
 
 #include "abstract/pin.h"
+#include "queue.h"
 
 class PinESP32 : public Pin {
     public:
-        PinESP32( gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt );
+        PinESP32( gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup );
 
-        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = Pin::PIN_INT_DISABLE );
+        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup );
+        virtual void enableInterrupt( uint8_t interruptType, QueuePtr queue );
         virtual void setState( uint8_t state );
         virtual std::string getClass() const;
         virtual uint8_t getPinID() const;

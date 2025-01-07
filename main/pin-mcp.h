@@ -2,6 +2,7 @@
 #define __PINMCP_H__
 
 #include "abstract/pin.h"
+#include "queue.h"
 
 class PinMcpManager;
 
@@ -26,8 +27,10 @@ class PinMcp : public Pin {
             PIN_B7 = 0x17
         };
 
-        PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE );
-        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE );
+        PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup );
+        virtual void enableInterrupt( uint8_t interruptType, QueuePtr queue );
+
+        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup );
         virtual void setState( uint8_t state );
 
         virtual std::string getClass() const { return "MCP"; }

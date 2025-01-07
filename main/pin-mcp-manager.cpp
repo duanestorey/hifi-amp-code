@@ -1,7 +1,7 @@
 #include "pin-mcp-manager.h"
 #include <memory.h>
 
-PinMcpManager::PinMcpManager( I2CBUSPtr bus, uint8_t addr ) : mBus( bus ), mAddr( addr ) {
+PinMcpManager::PinMcpManager( I2CBUSPtr bus, uint8_t addr, QueuePtr queue ) : mBus( bus ), mAddr( addr ), mInterruptQueue( queue ) {
 }
 
 uint8_t 
@@ -22,6 +22,28 @@ PinMcpManager::getState( uint8_t pin ) {
     }
 
     return isSet;
+}
+
+void 
+PinMcpManager::processPortAInterrupt() {
+    uint8_t intState = 0;
+    mBus->readRegisterByte( mAddr, 0x0e, intState );
+    for (int i = 0 ; i < 8; i++ ) {
+        if ( intState & ( 1 << i ) ) {
+            mInterruptQueue->add( Message::MSG_GPIO_INTERRUPT, 1, i );
+        }
+    }
+}
+        
+void 
+PinMcpManager::processPortBInterrupt() {
+    uint8_t intState = 0;
+    mBus->readRegisterByte( mAddr, 0x0f, intState );
+    for (int i = 0 ; i < 8; i++ ) {
+        if ( intState & ( 1 << i ) ) {
+            mInterruptQueue->add( Message::MSG_GPIO_INTERRUPT, 1, 0x10 | i );
+        }
+    }
 }
 
 void 
@@ -88,8 +110,8 @@ PinMcpManager::updateConfig() {
 }
 
 PinPtr 
-PinMcpManager::createPin( uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt ) {
-    PinPtr newPtr = PinPtr( new PinMcp( this, pin, direction, pulldown, pullup, interrupt ) );
+PinMcpManager::createPin( uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup ) {
+    PinPtr newPtr = PinPtr( new PinMcp( this, pin, direction, pulldown, pullup ) );
 
     mPinMap[ pin ] = newPtr;
 

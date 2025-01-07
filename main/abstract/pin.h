@@ -4,6 +4,7 @@
 #include <driver/gpio.h>
 #include <string>
 #include <memory>
+#include "../queue.h"
 
 class Pin {
     public:     
@@ -34,9 +35,11 @@ class Pin {
             PIN_STATE_HIGH
         };
 
-        Pin( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE );
+        Pin( uint8_t direction, uint8_t pulldown, uint8_t pullup );
         virtual bool operator==( const Pin& a ) { return a.getClass() == getClass() && a.getPinID() == getPinID(); }
-        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup, uint8_t interrupt = PIN_INT_DISABLE ) = 0;
+        virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup ) = 0;
+        virtual void enableInterrupt( uint8_t interruptType, QueuePtr queue );
+
         virtual void setState( uint8_t state ) = 0;
         virtual uint8_t getState() const = 0;
         virtual uint8_t getDirection() const { return mDir; }
@@ -49,7 +52,8 @@ class Pin {
         uint8_t mDir;
         uint8_t mPulldown;
         uint8_t mPullup;
-        uint8_t mInt;
+        uint8_t mInterruptType;
+        QueuePtr mInterruptQueue;
 };
 
 typedef std::shared_ptr<Pin> PinPtr;
