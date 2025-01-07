@@ -5,7 +5,6 @@ Pin::Pin( uint8_t direction, uint8_t pulldown, uint8_t pullup ) : mDir( directio
 }
 
 void 
-Pin::enableInterrupt( uint8_t interruptType, QueuePtr queue ) {
+Pin::enableInterrupt( uint8_t interruptType ) {
     mInterruptType = interruptType;
-    mInterruptQueue = queue;
 }

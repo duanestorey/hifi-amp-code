@@ -6,9 +6,11 @@ PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8
 }
 
 void 
-PinMcp::enableInterrupt( uint8_t interruptType, QueuePtr queue ) {
+PinMcp::enableInterrupt( uint8_t interruptType ) {
     if ( interruptType != Pin::PIN_INT_DISABLE ) {
-        Pin::enableInterrupt( interruptType, queue );
+        Pin::enableInterrupt( interruptType );
+
+        mPinManager->updateConfig();
     }
 }
 

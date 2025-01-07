@@ -9,7 +9,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 
-
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/ledc.h"
@@ -38,16 +37,6 @@ Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mU
     mDAC( 0 ), mChannelSel( 0 ), mWebServer( 0 ), mSPDIF( 0 ), mMicroprocessorTemp( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
     mPowerButton( 0 ), mVolumeButton( 0 ), mInputButton( 0 ) {
 
-    mDisplayQueue = QueuePtr( new Queue() );
-    mAudioQueue = QueuePtr( new Queue() );
-    mRadioQueue = QueuePtr( new Queue() );
-    mAmplifierQueue = QueuePtr( new Queue() );
-
-    mI2C = I2CBUSPtr( new I2CBUS() );
-    mTimer = TimerPtr( new Timer() );
-
-  //  mMcpPinManager = PinMcpManagerPtr( new PinMcpManager( mI2C, 0x10 ) );
-    mMasterVolume = VolumePtr( new VolumeController() );
 }
 
 void 
@@ -133,60 +122,80 @@ Amplifier::setupRemoteReceiver() {
     doActualRemoteReceive();
 }
 
+// I2C current map
+/*
+    Current
+    -------
+    LCD                             0x27
+    Channel Selector AX2358         0x4a
+    Microprocessor Temp Sensor      0x48   
+
+    PCM 5142 FL/FR                  0x4c
+    CS8416                          0x10
+
+    Deprecated
+    ------------
+    Dolby Decoder STA310            0x60 
+    PCM 1681 DAC                    0x4c
+
+    Future  
+    -------
+
+*/
+
 void 
 Amplifier::init() {
     nvs_flash_init(); 
 
-    configurePins();
-    setupPWM();
+    // Create queues
+    mDisplayQueue = QueuePtr( new Queue() );
+    mAudioQueue = QueuePtr( new Queue() );
+    mRadioQueue = QueuePtr( new Queue() );
+    mAmplifierQueue = QueuePtr( new Queue() );
 
-    taskDelayInMs( 10 );
+    // Create I2C bus
+    mI2C = I2CBUSPtr( new I2CBUS() );
 
-    activateButtonLight( true );
+    mMasterVolume = VolumePtr( new VolumeController() );
 
-    mTimerID = mTimer->setTimer( 60000, mAmplifierQueue, true );
-    mButtonTimerID = mTimer->setTimer( 10, mAmplifierQueue, true );
+    mPinManager = PinManagerPtr( new PinManager( mI2C, mAmplifierQueue ) );
+    mStandbyLED = mPinManager->createPin( PinManager::PIN_TYPE_ESP32, AMP_PIN_STANDBY_LED, Pin::PIN_TYPE_OUTPUT, Pin::PIN_PULLDOWN_ENABLE, Pin::PIN_PULLUP_DISABLE );
 
-    // I2C current map
-    /*
-        Current
-        -------
-        LCD                             0x27
-        Channel Selector AX2358         0x4a
-        Microprocessor Temp Sensor      0x48   
-
-        PCM 5142 FL/FR                  0x4c
-        CS8416                          0x10
-
-        Deprecated
-        ------------
-        Dolby Decoder STA310            0x60 
-        PCM 1681 DAC                    0x4c
-
-        Future  
-        -------
-
-    */
-
+    // setup LCD
     mLCD = new LCD( 0x27, mI2C );
+
+    // setup sensors
     mMicroprocessorTemp = new TMP100( 0x48, mI2C );
+
+    // setup channel selector
     mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
 
-    // PCM5142
+    // Setup output DACs
     mDAC = new DAC_PCM5142( 0x4c, mI2C );
 
-    // CS8416
+    // Setup digital inputs
     mSPDIF = new CS8416( 0x10, mI2C );
 
-    // Set up timers
-    mAudioTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
+    //configurePins();
+    //setupPWM();
+
+    //taskDelayInMs( 10 );
+
+  //  activateButtonLight( true );
+
 
     // Set up buttons
     mPowerButton = ButtonPtr( new Button( PIN_BUTTON_POWER, mAmplifierQueue ) );
-    mVolumeButton = ButtonPtr(new Button( PIN_BUTTON_VOLUME, mAmplifierQueue ) );
+    mVolumeButton = ButtonPtr( new Button( PIN_BUTTON_VOLUME, mAmplifierQueue ) );
     mInputButton = ButtonPtr( new Button( PIN_BUTTON_INPUT, mAmplifierQueue ) );
 
     mWebServer = new HTTP_Server( mAmplifierQueue );
+
+    // Setup timers
+    mTimer = TimerPtr( new Timer() );
+    mTimerID = mTimer->setTimer( 60000, mAmplifierQueue, true );
+    mButtonTimerID = mTimer->setTimer( 10, mAmplifierQueue, true );
+    mAudioTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
 
     setupRemoteReceiver();
 }

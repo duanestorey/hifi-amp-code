@@ -28,7 +28,7 @@ class PinMcp : public Pin {
         };
 
         PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup );
-        virtual void enableInterrupt( uint8_t interruptType, QueuePtr queue );
+        virtual void enableInterrupt( uint8_t interruptType );
 
         virtual void config( uint8_t direction, uint8_t pulldown, uint8_t pullup );
         virtual void setState( uint8_t state );

@@ -10,7 +10,6 @@ typedef gpio_num_t PIN;
 #define PIN_BUTTON_INPUT        GPIO_NUM_48
 #define PIN_BUTTON_POWER        GPIO_NUM_17
 
-
 #define PIN_LED_FRONT_POWER     GPIO_NUM_16
 #define PIN_LED_FRONT_STANDBY   GPIO_NUM_28
 

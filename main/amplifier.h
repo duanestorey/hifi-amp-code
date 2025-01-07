@@ -18,7 +18,8 @@
 #include "http-server.h"
 #include "cs8416.h"
 #include "driver/rmt_rx.h"
-#include "pin-mcp-manager.h"
+#include "pin-manager.h"
+#include "abstract/pin.h"
 #include "volume-controller.h"
 
 class Amplifier {
@@ -46,6 +47,8 @@ public:
     AmplifierState getCurrentState();
 protected:
     void asyncUpdateDisplay();
+
+    PinPtr mStandbyLED;
 
     bool mWifiEnabled;   
     bool mWifiConnectionAttempts;
@@ -99,7 +102,9 @@ protected:
     uint8_t mIRBuffer[ 218 ];
     rmt_channel_handle_t mIRChannel;
 
-    PinMcpManagerPtr mMcpPinManager;
+    //PinMcpManagerPtr mMcpPinManager;
+    PinManagerPtr mPinManager;
+
     VolumePtr mMasterVolume;
 
 private:

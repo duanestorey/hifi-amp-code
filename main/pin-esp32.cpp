@@ -1,12 +1,13 @@
 #include "pin-esp32.h"
+#include "pin-manager.h"
 
-PinESP32::PinESP32( gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup ) : Pin( direction, pulldown, pullup ), mPin( pin ) {
+PinESP32::PinESP32( PinManager *pinManager, gpio_num_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup ) : Pin( direction, pulldown, pullup ), mPinManager( pinManager ), mPin( pin ) {
     config( direction, pulldown, pullup );
 }
 
 void 
-PinESP32::enableInterrupt( uint8_t interruptType, QueuePtr queue ) {
-    Pin::enableInterrupt( interruptType, queue );
+PinESP32::enableInterrupt( uint8_t interruptType ) {
+    Pin::enableInterrupt( interruptType );
 
     gpio_int_type_t intType = GPIO_INTR_DISABLE;
     switch( interruptType ) {
@@ -25,6 +26,9 @@ PinESP32::enableInterrupt( uint8_t interruptType, QueuePtr queue ) {
     }
 
     gpio_set_intr_type( mPin, intType );
+
+    mPinManager->enableInterrupt( mPin, interruptType );
+
     gpio_intr_enable( mPin );
 }
 

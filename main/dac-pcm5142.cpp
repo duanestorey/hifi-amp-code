@@ -37,9 +37,12 @@ DAC_PCM5142::init() {
     // set auto clock to on
     mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_REG_AUTO_CLOCK, 0 );
 
-    // set left and right gain to -6dB
+    // Enable high attenuation filter
+    mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_REG_DSP, 0b00011 );
+
+    // set left and right gain to 0dB
     switchToPage( 1 );
-    mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_REG_GAIN_CTRL, 16 | 1 );
+    mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_REG_GAIN_CTRL, 0 );
     
 }
 
