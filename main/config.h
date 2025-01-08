@@ -1,6 +1,8 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
+#define AMP_DAC_TOTAL_NUM            3
+
 // I2C parameters
 #define I2C_MS_TO_WAIT              50
 #define I2C_MASTER_FREQ_HZ          200000

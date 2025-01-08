@@ -28,6 +28,7 @@ set(COMPONENT_SRCS
     "pin-mcp-manager.cpp"
     "volume-controller.cpp"
     "pin-manager.cpp"
+    "mdns-net.cpp"
 )
 set(COMPONENT_ADD_INCLUDEDIRS)
 

@@ -4,10 +4,11 @@
 #include "queue.h"
 #include <esp_http_server.h>
 #include <string>
+#include <memory>
 
-class HTTP_Server {
+class HTTPServer {
 public:
-    HTTP_Server( QueuePtr queue );
+    HTTPServer( QueuePtr queue );
 
     enum {
         SERVER_MAIN,
@@ -36,5 +37,7 @@ protected:
     httpd_handle_t mServerHandle;
     std::string mMainPage;
 };
+
+typedef std::shared_ptr<HTTPServer> HTTPServerPtr;
 
 #endif

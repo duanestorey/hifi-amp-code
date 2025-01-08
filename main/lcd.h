@@ -6,6 +6,7 @@
 #define LCD_I2C_ADDR		(0x27 << 1 )
 
 #include <string>
+#include <memory>
 
 #include "i2c-bus.h"
 
@@ -58,5 +59,7 @@ private:
 	void command( uint8_t data );
 	void pulseEnable( uint8_t data );
 };
+
+typedef std::shared_ptr<LCD> LCDPtr;
 
 #endif

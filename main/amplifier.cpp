@@ -33,8 +33,8 @@
 #include "netdb.h"
 #include "mdns.h"
 
-Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mDigitalAudioStarted( false ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ), mLCD( 0 ),
-    mDAC( 0 ), mChannelSel( 0 ), mWebServer( 0 ), mSPDIF( 0 ), mMicroprocessorTemp( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
+Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mDigitalAudioStarted( false ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ),
+    mChannelSel( 0 ), mSPDIF( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
     mPowerButton( 0 ), mVolumeButton( 0 ), mInputButton( 0 ) {
 
 }
@@ -64,18 +64,7 @@ Amplifier::updateConnectedStatus( bool connected, bool doActualUpdate ) {
     }   
 
     if ( connected ) {
-        esp_err_t err = mdns_init();
-        if (err) {
-            printf("MDNS Init failed: %d\n", err);
-            return;
-        }
-
-        //set hostname
-        mdns_hostname_set( "amp" ) ;
-
-        mdns_instance_name_set( "Hifi Audio Amplifier" );
-        mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
-
+        mDNS->start();
         mWebServer->start();
     } else {
         mWebServer->stop();
@@ -156,40 +145,37 @@ Amplifier::init() {
     // Create I2C bus
     mI2C = I2CBUSPtr( new I2CBUS() );
 
-    mMasterVolume = VolumePtr( new VolumeController() );
+    mMasterVolume = VolumeControllerPtr( new VolumeController() );
 
     mPinManager = PinManagerPtr( new PinManager( mI2C, mAmplifierQueue ) );
     mStandbyLED = mPinManager->createPin( PinManager::PIN_TYPE_ESP32, AMP_PIN_STANDBY_LED, Pin::PIN_TYPE_OUTPUT, Pin::PIN_PULLDOWN_ENABLE, Pin::PIN_PULLUP_DISABLE );
 
     // setup LCD
-    mLCD = new LCD( 0x27, mI2C );
+    mLCD = LCDPtr( new LCD( 0x27, mI2C ) );
 
     // setup sensors
-    mMicroprocessorTemp = new TMP100( 0x48, mI2C );
+    mMicroprocessorTemp = TempSensorPtr( new TMP100( 0x48, mI2C ) );
 
     // setup channel selector
     mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
 
     // Setup output DACs
-    mDAC = new DAC_PCM5142( 0x4c, mI2C );
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i] = DACPtr( new DAC_PCM5142( 0x4c + i, mI2C ) );
+        mMasterVolume->addForControl( std::dynamic_pointer_cast<Volume>( mDAC[i] ) );
+    }
 
     // Setup digital inputs
     mSPDIF = new CS8416( 0x10, mI2C );
 
-    //configurePins();
-    //setupPWM();
-
-    //taskDelayInMs( 10 );
-
-  //  activateButtonLight( true );
-
+    AMP_DEBUG_W( "TODO: Activate button light here" );
 
     // Set up buttons
     mPowerButton = ButtonPtr( new Button( PIN_BUTTON_POWER, mAmplifierQueue ) );
     mVolumeButton = ButtonPtr( new Button( PIN_BUTTON_VOLUME, mAmplifierQueue ) );
     mInputButton = ButtonPtr( new Button( PIN_BUTTON_INPUT, mAmplifierQueue ) );
 
-    mWebServer = new HTTP_Server( mAmplifierQueue );
+    mWebServer = HTTPServerPtr( new HTTPServer( mAmplifierQueue ) );
 
     // Setup timers
     mTimer = TimerPtr( new Timer() );
@@ -678,9 +664,14 @@ Amplifier::startDigitalAudio() {
     mSPDIF->init();
 
     AMP_DEBUG_I( "Starting DAC" );
-    mDAC->init();
-    mDAC->setFormat( DAC::FORMAT_I2S );
-    mDAC->setAttenuation( 0 );
+
+    mMasterVolume->setAttenuation( mState.mCurrentAttenuation );
+    
+    // Setup output DACs
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i]->init();
+        mDAC[i]->setFormat( DAC::FORMAT_I2S );
+    }
 
     // set the proper input channel
     AmplifierState state = getCurrentState();
@@ -692,8 +683,8 @@ Amplifier::startDigitalAudio() {
 
     taskDelayInMs( 10 );
 
-    AMP_DEBUG_I( "Enabling the DAC" );
-    mDAC->enable( true );
+    // AMP_DEBUG_I( "Enabling the DAC" );
+   // mDAC->enable( true );
 
     mDigitalAudioStarted = true;
 }
@@ -705,7 +696,7 @@ Amplifier::stopDigitalAudio() {
     mTimer->cancelTimer( mSpdifTimerID );
     mSpdifTimerID = 0;
 
-    mDAC->enable( false );
+   // mDAC->enable( false );
     mSPDIF->run( false );
 
     // disable CS8416
@@ -740,7 +731,7 @@ Amplifier::handleAudioThread() {
 
     AMP_DEBUG_I( "Setting involumeput" );
 
-    mChannelSel->setAttenuation( state.mCurrentAttenuation );
+    mMasterVolume->setAttenuation( state.mCurrentAttenuation );
     mChannelSel->setEnhancement( state.mEnhancement );
 
     AMP_DEBUG_I( "Setting input" );
@@ -760,6 +751,12 @@ Amplifier::handleAudioThread() {
 
     mChannelSel->mute( false );
     AMP_DEBUG_I( "Channel selector un-muted" );
+
+    // Enable the DACs
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i]->enable( true );
+    }
+
     
     // Set to playing status
     changeAmplifierState( AmplifierState::STATE_PLAYING );
@@ -855,11 +852,7 @@ Amplifier::handleAudioThread() {
                         // we are on the audio timer thread
                         if ( mPendingVolumeChange ) {
                             AMP_DEBUG_I( "Actually setting pending audio volume to %lu", mPendingVolume );
-                            bool result = mChannelSel->setAttenuation( mPendingVolume );
-                            if ( result ) {
-                                // if it failed, we will try again shortly
-                                mPendingVolumeChange = false;
-                            }
+                            mMasterVolume->setAttenuation( mPendingVolume );
                         }
                     } 
                     
@@ -959,6 +952,8 @@ Amplifier::setupWifi() {
     esp_wifi_set_config( WIFI_IF_STA, &wifi_config );
 
     mWifiEnabled = true;
+
+    mDNS = MDNSPtr( new MDNS() );
 
     esp_wifi_start();
 
@@ -1181,79 +1176,4 @@ Amplifier::activateButtonLight( bool activate ) {
 	    ledc_update_duty( LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1 );
     }
 
-}
-
-void
-Amplifier::configurePins() {
-    AMP_DEBUG_I( "Configuring pins" );
-    gpio_install_isr_service( 0 );
-
-    // Configure LEDs
-   // configureOnePin( PIN_LED_ACTIVE, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_ENABLE, GPIO_PULLUP_DISABLE );
-    
-    // The standby power LED indicator
- //   configureOnePin( PIN_LED_FRONT_STANDBY, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_DISABLE );
-
-    AMP_DEBUG_I( "Activating standby" );
-   // gpio_set_level( PIN_LED_FRONT_STANDBY, 1 );
-
-    configureOnePin( PIN_LED_FRONT_POWER, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_DISABLE );
-    gpio_set_level( PIN_LED_FRONT_POWER, 1 );
-
-    // Configure Output Triggers
-    configureOnePin( PIN_RELAY, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_ENABLE, GPIO_PULLUP_DISABLE );
-    gpio_set_level( PIN_RELAY, 0 );
-
-    // Configure Buttons
-    configureOnePin( PIN_BUTTON_VOLUME, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( PIN_BUTTON_VOLUME, Volume_Button_ISR, this );
-
-    configureOnePin( GPIO_NUM_15, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( GPIO_NUM_15, Volume_Button_Encoder_ISR, this );
-
-    configureOnePin( GPIO_NUM_13, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( GPIO_NUM_13, Volume_Button_Encoder_ISR, this );
-
-    configureOnePin( PIN_BUTTON_INPUT, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( PIN_BUTTON_INPUT, Input_Button_ISR, this );
-
-    configureOnePin( GPIO_NUM_4, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( GPIO_NUM_4, Input_Button_Encoder_ISR, this );
-
-    configureOnePin( GPIO_NUM_16, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( GPIO_NUM_16, Input_Button_Encoder_ISR, this );
-
-    configureOnePin( PIN_BUTTON_POWER, GPIO_INTR_ANYEDGE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( PIN_BUTTON_POWER, Power_Button_ISR, this );
-
-    // Configure Others
-    configureOnePin( PIN_BACKLIGHT, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_ENABLE, GPIO_PULLUP_DISABLE );
-    gpio_set_level( PIN_BACKLIGHT, 1 );
-
-    // Decoder reset
-    configureOnePin( PIN_DECODER_RESET, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_ENABLE, GPIO_PULLUP_DISABLE );
-    gpio_set_level( PIN_DECODER_RESET, 0 );
-
-    // SPDIF reset
-    configureOnePin( PIN_CS8416_RESET, GPIO_INTR_DISABLE, GPIO_MODE_OUTPUT, GPIO_PULLDOWN_ENABLE, GPIO_PULLUP_DISABLE );
-    gpio_set_level( PIN_CS8416_RESET, 0 );
-
-    // Setting up decoder
-    configureOnePin( PIN_DECODER_IRQ, GPIO_INTR_DISABLE, GPIO_MODE_INPUT, GPIO_PULLDOWN_DISABLE, GPIO_PULLUP_ENABLE );
-    gpio_isr_handler_add( PIN_DECODER_IRQ, Decoder_ISR, this );
-    gpio_set_intr_type( PIN_DECODER_IRQ, GPIO_INTR_NEGEDGE );
-}
-
-void 
-Amplifier::configureOnePin( PIN pin, gpio_int_type_t interrupts, gpio_mode_t mode, gpio_pulldown_t pulldown, gpio_pullup_t pullup ) {
-    uint_fast32_t mask = ( ((uint_fast32_t)1) << ( uint_fast32_t ) pin );
-    gpio_config_t io_conf;
-
-	io_conf.intr_type = interrupts;
-	io_conf.mode = mode;
-	io_conf.pin_bit_mask = mask;
-	io_conf.pull_down_en = pulldown;
-	io_conf.pull_up_en = pullup;
-
-	gpio_config( &io_conf );   
 }

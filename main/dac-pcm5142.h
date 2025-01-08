@@ -2,14 +2,17 @@
 #define __DAC_PCM51X4_H__
 
 #include "abstract/dac.h"
+#include "abstract/volume.h"
 #include "i2c-bus.h"
 
-class DAC_PCM5142 : public DAC {
+class DAC_PCM5142 : public DAC,
+                    public Volume {
 public:
     enum {
         PCM5142_PAGE_SELECT = 0,
         PCM5142_PAGE_RESET = 1,
         PCM5142_PAGE_STANDBY = 2,
+        PCM5142_PAGE_MUTE = 3,
         PCM5142_REG_INT_SPEED = 34,
         PCM5142_REG_AUTO_CLOCK = 37,
         PCM5142_REG_FORMAT = 40,
@@ -35,13 +38,19 @@ public:
     virtual void setFormat( uint8_t format );
     virtual void enable( bool state );
 
-	virtual void setChannelAttenuation( int channel, int att );
-	virtual void setAttenuation( int att );
+    virtual void mute( bool setMute );
+    virtual bool isMuted() const;
+    virtual int16_t getMaxAttenuation() const;
+    virtual int16_t getMinAttenuation() const;
+    virtual int16_t getAttenuationStep() const;
+    virtual void setAttenuation( uint16_t attenuation ); 
+
     virtual void setPrecision( uint8_t precision );
 protected:
     uint8_t mAddress;
     I2CBUSPtr mI2C;
-    bool mEnabled;
+    bool mMuted;
+
     uint8_t mCurrentPage;
     uint8_t mPrecision;
     uint8_t mFormat;
@@ -52,6 +61,9 @@ private:
     void switchToPage( uint8_t page );
     void reset();
     void detectAudio();
+
+    void _setChannelAttenuation( int channel, int att );
+	void _setAttenuation( int att );
 };
 
 #endif

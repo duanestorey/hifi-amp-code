@@ -1,5 +1,6 @@
 #include "pin-mcp.h"
 #include "pin-mcp-manager.h"
+#include "debug.h"
 
 PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8_t pulldown, uint8_t pullup ) : Pin( direction, pulldown, pullup ), mPin( pin ), mPinManager( pinManager ) {
     config( direction, pulldown, pullup );
@@ -7,10 +8,13 @@ PinMcp::PinMcp( PinMcpManager *pinManager, uint8_t pin, uint8_t direction, uint8
 
 void 
 PinMcp::enableInterrupt( uint8_t interruptType ) {
-    if ( interruptType != Pin::PIN_INT_DISABLE ) {
-        Pin::enableInterrupt( interruptType );
-
-        mPinManager->updateConfig();
+    if ( interruptType == Pin::PIN_INT_BOTH ) {
+        AMP_DEBUG_E( "Unsupprted MCP interrupt type, PIN_INT_BOTH" );
+    } else {
+        if ( interruptType != Pin::PIN_INT_DISABLE ) {
+            Pin::enableInterrupt( interruptType );
+            mPinManager->updateConfig();
+        }   
     }
 }
 

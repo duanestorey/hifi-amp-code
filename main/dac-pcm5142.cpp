@@ -1,7 +1,7 @@
 #include "dac-pcm5142.h"
 #include "debug.h"
 
-DAC_PCM5142::DAC_PCM5142( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mI2C( bus ), mCurrentPage( 255 ), mPrecision( DAC::PRECISION_24_BIT ), 
+DAC_PCM5142::DAC_PCM5142( uint8_t address, I2CBUSPtr bus ) : mAddress( address ), mI2C( bus ), mMuted( false ), mCurrentPage( 255 ), mPrecision( DAC::PRECISION_24_BIT ), 
     mFormat( DAC::FORMAT_I2S ), mDetectedSamplingRate( 0 ), mDetectedClkRatio( 0 ) {
 }
 
@@ -116,7 +116,49 @@ DAC_PCM5142::enable( bool state ) {
 }
 
 void 
-DAC_PCM5142::setChannelAttenuation( int channel, int att ) {
+DAC_PCM5142::mute( bool setMute ) {
+    if ( setMute != mMuted ) {
+        return;
+    }
+
+    switchToPage( 0 );
+    if ( setMute ) {
+        mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_PAGE_MUTE, 0x11 );
+    } else {
+        mI2C->writeRegisterByte( mAddress, DAC_PCM5142::PCM5142_PAGE_MUTE, 0x00 );
+    }
+
+    mMuted = setMute;
+}
+
+bool 
+DAC_PCM5142::isMuted() const {
+    return mMuted;
+}
+
+
+int16_t 
+DAC_PCM5142::getMaxAttenuation() const {
+    return 79;
+}
+
+int16_t 
+DAC_PCM5142::getMinAttenuation() const {
+    return 0;
+}
+
+int16_t 
+DAC_PCM5142::getAttenuationStep() const {
+    return 1;
+}
+
+void 
+DAC_PCM5142::setAttenuation( uint16_t attenuation ) {
+    _setAttenuation( attenuation );
+}
+
+void 
+DAC_PCM5142::_setChannelAttenuation( int channel, int att ) {
     // 0db is       0b00110000
     // -103 db is   0b11111110 103db
     // mute is      0b11111111
@@ -138,9 +180,9 @@ DAC_PCM5142::setChannelAttenuation( int channel, int att ) {
 }
 
 void 
-DAC_PCM5142::setAttenuation( int att ) {
-    setChannelAttenuation( DAC::FRONT_LEFT, att );
-    setChannelAttenuation( DAC::FRONT_RIGHT, att );
+DAC_PCM5142::_setAttenuation( int att ) {
+    _setChannelAttenuation( DAC::FRONT_LEFT, att );
+    _setChannelAttenuation( DAC::FRONT_RIGHT, att );
 }
 
 void 

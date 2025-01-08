@@ -21,6 +21,7 @@
 #include "pin-manager.h"
 #include "abstract/pin.h"
 #include "volume-controller.h"
+#include "mdns-net.h"
 
 class Amplifier {
 public:
@@ -77,14 +78,17 @@ protected:
     AmplifierState mState;
     I2CBUSPtr mI2C;
 
-    LCD *mLCD;
+    LCDPtr mLCD;
 
-    DAC *mDAC;
+    DACPtr mDAC[AMP_DAC_TOTAL_NUM];
+    
     ChannelSel *mChannelSel;
-    HTTP_Server *mWebServer;
+    HTTPServerPtr mWebServer;
+    MDNSPtr mDNS;
+
     CS8416 *mSPDIF;
 
-    TMP100 *mMicroprocessorTemp;
+    TempSensorPtr mMicroprocessorTemp;
 
     Encoder mVolumeEncoder;
     Encoder mInputEncoder;
@@ -105,12 +109,9 @@ protected:
     //PinMcpManagerPtr mMcpPinManager;
     PinManagerPtr mPinManager;
 
-    VolumePtr mMasterVolume;
+    VolumeControllerPtr mMasterVolume;
 
 private:
-    void configurePins();
-    void configureOnePin( PIN pin, gpio_int_type_t interrupts, gpio_mode_t mode, gpio_pulldown_t pulldown, gpio_pullup_t pullup );
-
     void setupWifi();
     void attemptWifiConnect();
     void taskDelayInMs( uint32_t ms );
