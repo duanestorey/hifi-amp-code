@@ -9,6 +9,7 @@
 
 // I2C addresses
 #define AMP_I2C_ADDR_MCP            0x20
+#define AMP_I2C_ADDR_RECEIVER       0x40
 
 // IR receiver
 #define AMP_PIN_IR_RECEIVER         15

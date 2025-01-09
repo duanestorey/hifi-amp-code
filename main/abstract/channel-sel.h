@@ -23,9 +23,9 @@ public:
         CHANNEL_SUBWOOFER = 5,
         CHANNEL_ALL = 6
     };
-
     virtual void init() = 0;
     virtual void setInput( uint8_t input ) = 0;
+    
     virtual void mute( bool mute ) = 0;
     virtual void muteChannel( uint8_t channel, bool mute ) = 0;
     virtual void setEnhancement( bool enhancementOn ) = 0;

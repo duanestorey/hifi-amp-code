@@ -22,7 +22,6 @@ public:
         MSG_DISPLAY_DONE_INIT,
         MSG_DISPLAY_SHOULD_UPDATE,
         MSG_WIFI_UPDATE,
-        MSG_DECODER_IRQ,
         MSG_INPUT_UP,
         MSG_INPUT_DOWN,
         MSG_INPUT_SET,

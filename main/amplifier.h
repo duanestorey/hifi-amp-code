@@ -16,12 +16,17 @@
 #include "encoder.h"
 #include "button.h"
 #include "http-server.h"
-#include "cs8416.h"
 #include "driver/rmt_rx.h"
 #include "pin-manager.h"
 #include "abstract/pin.h"
 #include "volume-controller.h"
+#include "analog-channel-selector.h"
+#include "digital-receiver.h"
 #include "mdns-net.h"
+#include "input.h"
+#include <vector>
+
+typedef std::vector<InputPtr> InputVector;
 
 class Amplifier {
 public:
@@ -35,7 +40,6 @@ public:
     void handleTimerThread();
 
     void _handleWifiCallback( int32_t event_id );
-    void _handleDecoderISR();
     void _handlePowerButtonISR();
     void _handleVolumeButtonISR();
     void _handleVolumeButtonEncoderISR();
@@ -44,8 +48,6 @@ public:
     void _handleNecRemoteCommand( uint8_t address, uint8_t command );
 
     void _handleIRInterrupt( const rmt_rx_done_event_data_t *edata );
-
-    AmplifierState getCurrentState();
 protected:
     void asyncUpdateDisplay();
 
@@ -55,7 +57,6 @@ protected:
     bool mWifiConnectionAttempts;
     bool mUpdatingFromNTP;
     bool mPoweredOn;
-    bool mDigitalAudioStarted;
 
     TimerPtr mTimer;
 
@@ -76,17 +77,20 @@ protected:
     uint32_t mReconnectTimerID;
 
     AmplifierState mState;
+
+    uint8_t mCurrentInput;
+    InputVector mAllInputs;
+
     I2CBUSPtr mI2C;
 
     LCDPtr mLCD;
 
     DACPtr mDAC[AMP_DAC_TOTAL_NUM];
     
-    ChannelSel *mChannelSel;
     HTTPServerPtr mWebServer;
     MDNSPtr mDNS;
-
-    CS8416 *mSPDIF;
+    AnalogChannelSelectorPtr mChannelSel;
+    DigitalReceiverPtr mDigitalReceiver;
 
     TempSensorPtr mMicroprocessorTemp;
 
@@ -102,6 +106,8 @@ protected:
     ButtonPtr mPowerButton;
     ButtonPtr mVolumeButton;
     ButtonPtr mInputButton;
+
+    std::vector<TickPtr> mNeedsTick;
 
     uint8_t mIRBuffer[ 218 ];
     rmt_channel_handle_t mIRChannel;
@@ -119,7 +125,6 @@ private:
     void updateTimeFromNTP();
     void handleWifiCallback( int32_t event_id );
 
-    void updateInput( uint8_t newInput );
     void updateConnectedStatus( bool connected, bool doActualUpdate = true );
 
     void updateDisplay();
@@ -128,15 +133,21 @@ private:
     void handlePowerButtonPress();
     void handleInputButtonPress();
     void handleVolumeButtonPress();
-    void handleDecoderIRQ();
 
+    AmplifierState getCurrentState();
     void changeAmplifierState( uint8_t newState );
-    void startDigitalAudio();
-    void stopDigitalAudio();
+    InputPtr getCurrentInput();
+
+    void startAudio();
+    void stopAudio();
 
     void activateButtonLight( bool activate = true );
     void setupRemoteReceiver();
     void doActualRemoteReceive();
+
+
+    void addInput( InputPtr input ) { mAllInputs.push_back( input ); }
+    void audioChangeInput();
 
     Mutex mStateMutex;
 

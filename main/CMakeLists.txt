@@ -11,16 +11,12 @@ set(COMPONENT_SRCS
     "queue.cpp" 
     "i2c-bus.cpp" 
     "lcd.cpp" 
-    "dac-pcm1681.cpp" 
-    "channelsel-ax2358.cpp" 
     "tmp100.cpp" 
     "encoder.cpp" 
-    "dolby-sta310.cpp" 
     "button.cpp" 
     "http-server.cpp" 
     "debug.cpp" 
     "dac-pcm5142.cpp" 
-    "cs8416.cpp" 
     "ir-receiver.cpp" 
     "pin-esp32.cpp"
     "pin.cpp"
@@ -29,6 +25,11 @@ set(COMPONENT_SRCS
     "volume-controller.cpp"
     "pin-manager.cpp"
     "mdns-net.cpp"
+    "input.cpp"
+    "state.cpp"
+    "analog-channel-selector.cpp"
+    "digital-receiver.cpp"
+    "adc-pcm1863.cpp"
 )
 set(COMPONENT_ADD_INCLUDEDIRS)
 

@@ -156,37 +156,37 @@ HTTPServer::handleResponse( uint8_t requestType, httpd_req_t *req ) {
             return httpd_resp_send(req, NULL, 0 );
             break;  
         case HTTPServer::SERVER_INPUT_HDMI:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_1 );
+           // mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_1 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );
             break;  
         case HTTPServer::SERVER_INPUT_BLUERAY:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_2 );
+           // mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_2 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );
             break;      
         case HTTPServer::SERVER_INPUT_TV:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_1 );
+          //  mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_1 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );
             break;   
         case HTTPServer::SERVER_INPUT_STREAMER:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_3 );
+          //  mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_SPDIF_3 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );
             break; 
         case HTTPServer::SERVER_INPUT_GAME:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_2 );
+          //  mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_2 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );
             break;      
         case HTTPServer::SERVER_INPUT_VINYL:
-            mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_3 );
+          //  mQueue->add( Message::MSG_INPUT_SET, AmplifierState::INPUT_STEREO_3 );
             httpd_resp_set_status( req, HTTPD_307 );
             httpd_resp_set_hdr( req, "Location", "/");
             return httpd_resp_send(req, NULL, 0 );

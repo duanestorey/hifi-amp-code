@@ -1,16 +1,18 @@
 #ifndef __BUTTON_H__
 #define __BUTTON_H__
 
+#include "abstract/tick.h"
 #include "queue.h"
 #include <memory>
 
 #define BUTTON_DEBOUNCE_TIME    25
 
-class Button {
+class Button : public Tick {
 public:
     Button( uint8_t gpio, QueuePtr queue, uint16_t debounceMs = BUTTON_DEBOUNCE_TIME );
     void handleInterrupt();
-    void tick();
+    
+    virtual void tick();
 protected:
     uint8_t mGpio;
     uint16_t mDebounceTime;

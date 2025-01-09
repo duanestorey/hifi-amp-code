@@ -23,18 +23,15 @@
 
 #include "sdkconfig.h"
 #include "dac-pcm5142.h"
-#include "cs8416.h"
-#include "channelsel-ax2358.h"
 #include "button.h"
 #include "http-server.h"
 
 #include "esp_netif_ip_addr.h"
 #include "esp_mac.h"
 #include "netdb.h"
-#include "mdns.h"
 
-Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mDigitalAudioStarted( false ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ),
-    mChannelSel( 0 ), mSPDIF( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
+Amplifier::Amplifier() : mWifiEnabled( false ), mWifiConnectionAttempts( 0 ), mUpdatingFromNTP( false ), mPoweredOn( true ), mTimerID( 0 ), mButtonTimerID( 0 ), mReconnectTimerID( 0 ),
+    mCurrentInput( 0 ), mVolumeEncoder( 15, 13, true ), mInputEncoder( 4, 16, false ), mAudioTimerID( 0 ), mSpdifTimerID( 0 ), mPendingVolumeChange( false ), mPendingVolume( 0 ),
     mPowerButton( 0 ), mVolumeButton( 0 ), mInputButton( 0 ) {
 
 }
@@ -50,6 +47,13 @@ Amplifier::getCurrentState() {
 
     AmplifierState stateCopy = mState;
     return stateCopy;
+}
+
+InputPtr 
+Amplifier::getCurrentInput() {
+    ScopedLock lock( mStateMutex );
+
+    return mState.mCurrentInput;
 }
 
 void 
@@ -116,16 +120,17 @@ Amplifier::setupRemoteReceiver() {
     Current
     -------
     LCD                             0x27
-    Channel Selector AX2358         0x4a
+    DIX9211                         0x40
     Microprocessor Temp Sensor      0x48   
 
-    PCM 5142 FL/FR                  0x4c
-    CS8416                          0x10
+    PCM 5142 FL/FR                  0x4c 
 
     Deprecated
     ------------
     Dolby Decoder STA310            0x60 
     PCM 1681 DAC                    0x4c
+    Channel Selector AX2358         0x4a
+    CS8416                          0x10
 
     Future  
     -------
@@ -137,53 +142,90 @@ Amplifier::init() {
     nvs_flash_init(); 
 
     // Create queues
+    AMP_DEBUG_I( "Setting up message queues" );
     mDisplayQueue = QueuePtr( new Queue() );
     mAudioQueue = QueuePtr( new Queue() );
     mRadioQueue = QueuePtr( new Queue() );
     mAmplifierQueue = QueuePtr( new Queue() );
 
     // Create I2C bus
+    AMP_DEBUG_I( "Setting up I2C bus" );
     mI2C = I2CBUSPtr( new I2CBUS() );
 
+    // Create volume controller
+    AMP_DEBUG_I( "Setting up volume controller" );
     mMasterVolume = VolumeControllerPtr( new VolumeController() );
 
+    // Create pin manager
+    AMP_DEBUG_I( "Setting up pin manager" );
     mPinManager = PinManagerPtr( new PinManager( mI2C, mAmplifierQueue ) );
     mStandbyLED = mPinManager->createPin( PinManager::PIN_TYPE_ESP32, AMP_PIN_STANDBY_LED, Pin::PIN_TYPE_OUTPUT, Pin::PIN_PULLDOWN_ENABLE, Pin::PIN_PULLUP_DISABLE );
 
-    // setup LCD
+    // Setup LCD display
+    AMP_DEBUG_I( "Setting up LCD display" );
     mLCD = LCDPtr( new LCD( 0x27, mI2C ) );
 
-    // setup sensors
+    // Setup temperature sensors
+    AMP_DEBUG_I( "Setting up temperature sensors" );
     mMicroprocessorTemp = TempSensorPtr( new TMP100( 0x48, mI2C ) );
 
     // setup channel selector
-    mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
+    AMP_DEBUG_I( "Setting up channel selectors" );
+   // mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
+    mChannelSel = AnalogChannelSelectorPtr( new AnalogChannelSelector( mI2C, mPinManager ) );
+
+    AMP_DEBUG_I( "Setting up digital receiver" );
+    mDigitalReceiver = DigitalReceiverPtr( new DigitalReceiver( mI2C, AMP_I2C_ADDR_RECEIVER, mPinManager ) );
 
     // Setup output DACs
+    AMP_DEBUG_I( "Setting up DACs" );
     for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
         mDAC[i] = DACPtr( new DAC_PCM5142( 0x4c + i, mI2C ) );
         mMasterVolume->addForControl( std::dynamic_pointer_cast<Volume>( mDAC[i] ) );
     }
 
     // Setup digital inputs
-    mSPDIF = new CS8416( 0x10, mI2C );
+    AMP_DEBUG_I( "Setting up digital transceiver" );
+    mDigitalReceiver->init();
+  //  mSPDIF = new CS8416( 0x10, mI2C );
 
     AMP_DEBUG_W( "TODO: Activate button light here" );
 
     // Set up buttons
+    AMP_DEBUG_I( "Setting up button" );
     mPowerButton = ButtonPtr( new Button( PIN_BUTTON_POWER, mAmplifierQueue ) );
     mVolumeButton = ButtonPtr( new Button( PIN_BUTTON_VOLUME, mAmplifierQueue ) );
     mInputButton = ButtonPtr( new Button( PIN_BUTTON_INPUT, mAmplifierQueue ) );
 
+    mNeedsTick.push_back( std::dynamic_pointer_cast<Tick>( mPowerButton ) );
+    mNeedsTick.push_back( std::dynamic_pointer_cast<Tick>( mVolumeButton ) );
+    mNeedsTick.push_back( std::dynamic_pointer_cast<Tick>( mInputButton ) );
+
+    AMP_DEBUG_I( "Setting up web server" );
     mWebServer = HTTPServerPtr( new HTTPServer( mAmplifierQueue ) );
 
     // Setup timers
+    AMP_DEBUG_I( "Setting up periodic timers" );
     mTimer = TimerPtr( new Timer() );
     mTimerID = mTimer->setTimer( 60000, mAmplifierQueue, true );
     mButtonTimerID = mTimer->setTimer( 10, mAmplifierQueue, true );
     mAudioTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
 
+    AMP_DEBUG_I( "Setting up IR receiver" );
     setupRemoteReceiver();
+
+    // setting up inputs
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_DIGITAL, Input::INPUT_PORT_SPDIF, 0, "HDMI" ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_DIGITAL, Input::INPUT_PORT_SPDIF, 1, "Blueray" ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_DIGITAL, Input::INPUT_PORT_SPDIF, 2 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_DIGITAL, Input::INPUT_PORT_SPDIF, 3 ) ) );
+
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 0 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 1 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 2 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 3 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 4 ) ) );
+    addInput( InputPtr( new Input( Input::INPUT_TYPE_ANALOG, Input::INPUT_PORT_RCA, 5, "Vinyl" ) ) );
 }
 
 void 
@@ -220,6 +262,7 @@ Amplifier::handleDisplayThread() {
 void
 Amplifier::updateDisplay() {
     AmplifierState state = getCurrentState();
+
     char s[32];
     char d[14];
 
@@ -258,39 +301,21 @@ Amplifier::updateDisplay() {
     mLCD->writeLine( 1, s );
 
     char rate[15] = {0};
-    if ( state.mAudioType == AmplifierState::AUDIO_ANALOG ) {
-        strcpy( rate, "" );
-    } else if ( state.mAudioType == AmplifierState::AUDIO_DIGITAL ) {
-        if ( state.mSamplingRate == 44100 ) {
-            sprintf( rate, "44.1k/%d", state.mBitDepth );
-        } else {
-            sprintf( rate, "%luk/%d", state.mSamplingRate / 1000, state.mBitDepth );
-        }   
-    }
+    switch( state.mCurrentInput->mType ) {
+        case Input::INPUT_TYPE_ANALOG:
+            sprintf( s, "Analog" );
+            break;
+        case Input::INPUT_TYPE_DIGITAL:
+            if ( state.mSamplingRate == 44100 ) {
+                sprintf( rate, "44.1k/%d", state.mBitDepth );
+            } else {
+                sprintf( rate, "%luk/%d", state.mSamplingRate / 1000, state.mBitDepth );
+            }   
 
-    char left[11] = {0};
-    switch( state.mAudioType ) {
-        case AmplifierState::AUDIO_ANALOG:
-            if ( state.mEnhancement ) {
-                strcpy( left, "Analog/Enh" );
-            }  else {
-                strcpy( left, "Analog" );
-            }
-            sprintf( s, "%-10s%10s", left, rate );
-            break;
-        case AmplifierState::AUDIO_DOLBY:
-            sprintf( s, "%-10s%10s", "AC3", rate );
-            break;
-        case AmplifierState::AUDIO_DTS:
-            sprintf( s, "%-10s%10s", "DTS", rate );
-            break;
-        case AmplifierState::AUDIO_PCM:
-            sprintf( s, "%-10s%10s", "PCM", rate );
-            break;
-        case AmplifierState::AUDIO_DIGITAL:
             sprintf( s, "%-10s%10s", "Digital", rate );
             break;
     }
+
     mLCD->writeLine( 2, std::string( s ) );
 
     char input[24];
@@ -304,27 +329,7 @@ Amplifier::updateDisplay() {
             break;
     }
 
-    switch( state.mInput ) {
-        case AmplifierState::INPUT_STEREO_1:
-            sprintf( input, "%-12s%8s", "TV", audioType );
-            break;
-        case AmplifierState::INPUT_STEREO_2:
-            sprintf( input, "%-12s%8s", "Game", audioType );
-            break;
-        case AmplifierState::INPUT_STEREO_3:
-            sprintf( input, "%-12s%8s", "Vinyl", audioType );
-            break;
-        case AmplifierState::INPUT_SPDIF_1:
-            sprintf( input, "%-12s%8s", "HDMI", audioType );
-            break;    
-        case AmplifierState::INPUT_SPDIF_2:
-            sprintf( input, "%-12s%8s", "Blueray", audioType );
-            break;    
-        case AmplifierState::INPUT_SPDIF_3:
-            sprintf( input, "%-12s%8s", "SPDIF", audioType );
-            break;           
-    }
-
+    sprintf( input, "%-12s%8s", state.mCurrentInput->mName.c_str(), audioType );
     mLCD->writeLine( 3, input );
 }
 
@@ -346,25 +351,6 @@ Amplifier::handleTimerThread() {
 
         taskDelayInMs( 5 );
     } 
-}
-
-void
-Amplifier::updateInput( uint8_t newInput ) {
-    AMP_DEBUG_I( "Trying to set input to %d", newInput );
-    {
-        ScopedLock lock( mStateMutex );
-
-        mState.mInput = newInput;  
-        if ( newInput == AmplifierState::INPUT_SPDIF_1 || newInput == AmplifierState::INPUT_SPDIF_2 || newInput == AmplifierState::INPUT_SPDIF_3 ) {
-            mState.mAudioType = AmplifierState::AUDIO_DIGITAL;
-        } else {
-            mState.mAudioType = AmplifierState::AUDIO_ANALOG;
-        }
-    }
-
-    mAudioQueue->add( Message::MSG_INPUT_SET, mState.mInput );
-
-    asyncUpdateDisplay();
 }
 
 void 
@@ -477,14 +463,12 @@ Amplifier::handleAmplifierThread() {
                         AMP_DEBUG_I( "In Periodic Timer Event, Temp is %0.2f", mMicroprocessorTemp->readTemperature() );
                         asyncUpdateDisplay();
                     } else if ( msg.mParam == mButtonTimerID ) {
-                        mVolumeButton->tick();
-                        mInputButton->tick();
-                        mPowerButton->tick();
+                        // Process all button ticks
+                        for ( std::vector<TickPtr>::iterator i = mNeedsTick.begin(); i != mNeedsTick.end(); i++ ) {
+                            (*i)->tick();
+                        }
                     }
-                    break;
-                case Message::MSG_DECODER_IRQ:
-                    handleDecoderIRQ();
-                    break;    
+                    break;  
                 case Message::MSG_VOLUME_UP:
                     {
                         ScopedLock lock( mStateMutex );
@@ -522,65 +506,36 @@ Amplifier::handleAmplifierThread() {
                     }  
                     break;
                 case Message::MSG_INPUT_UP:
-                    switch( mState.mInput ) {
-                        case AmplifierState::INPUT_STEREO_1:
-                            updateInput( AmplifierState::INPUT_STEREO_2 );
-                            break;
-                        case AmplifierState::INPUT_STEREO_2:
-                            updateInput( AmplifierState::INPUT_STEREO_3 );
-                            break;
-                        case AmplifierState::INPUT_STEREO_3:
-                            updateInput( AmplifierState::INPUT_SPDIF_1 );
-                            break;
-                        case AmplifierState::INPUT_SPDIF_1:
-                            updateInput( AmplifierState::INPUT_SPDIF_2 );
-                            break;  
-                        case AmplifierState::INPUT_SPDIF_2:
-                            updateInput( AmplifierState::INPUT_SPDIF_3 );
-                            break;   
-                        case AmplifierState::INPUT_SPDIF_3:
-                            updateInput( AmplifierState::INPUT_STEREO_1 );
-                            break;     
-                        /*
-                        case AmplifierState::INPUT_6CH:
-                            updateInput( AmplifierState::INPUT_STEREO_1 );
-                            break;
-                        */
-                        default:
-                            break;
+                    {
+                        if ( mCurrentInput < ( mAllInputs.size() - 1 ) ) {
+                            mCurrentInput++;
+                        } else {
+                            mCurrentInput = 0;
+                        }
+
+                        ScopedLock lock( mStateMutex );
+                        mState.mCurrentInput = mAllInputs[ mCurrentInput ];
+
+                        mAudioQueue->add( Message::MSG_INPUT_SET );
+                        asyncUpdateDisplay();
                     }
+
                     break;
                 case Message::MSG_INPUT_DOWN:
-                    switch( mState.mInput ) {
-                        case AmplifierState::INPUT_STEREO_1:
-                            updateInput( AmplifierState::INPUT_SPDIF_3 );
-                            break;
-                        case AmplifierState::INPUT_STEREO_2:
-                            updateInput( AmplifierState::INPUT_STEREO_1 );
-                            break;
-                        case AmplifierState::INPUT_STEREO_3:
-                            updateInput( AmplifierState::INPUT_STEREO_2 );
-                            break;
-                        case AmplifierState::INPUT_SPDIF_1:
-                            updateInput( AmplifierState::INPUT_STEREO_3 );
-                            break;
-                        case AmplifierState::INPUT_SPDIF_2:
-                            updateInput( AmplifierState::INPUT_SPDIF_1 );
-                            break;  
-                        case AmplifierState::INPUT_SPDIF_3:
-                            updateInput( AmplifierState::INPUT_SPDIF_2 );
-                            break;          
-                        /*
-                        case AmplifierState::INPUT_6CH:
-                            updateInput( AmplifierState::INPUT_STEREO_4 );
-                            break;
-                        */
-                        default:
-                            break;
-                    }     
-                    break;
-                case Message::MSG_INPUT_SET:
-                    updateInput( msg.mParam );
+                    {
+                        if ( mCurrentInput > 0 ) {
+                            mCurrentInput--;
+                        } else {
+                            mCurrentInput = mAllInputs.size() - 1;
+                        }
+
+                        ScopedLock lock( mStateMutex );
+                        mState.mCurrentInput = mAllInputs[ mCurrentInput ];
+
+                        mAudioQueue->add( Message::MSG_INPUT_SET );
+                        asyncUpdateDisplay();
+                    }
+                
                     break;
                 case Message::MSG_BUTTON_PRESSED:
                     AMP_DEBUG_I(  "Button pressed! %lu", msg.mParam );
@@ -608,12 +563,6 @@ Amplifier::handleAmplifierThread() {
     } 
 }   
 
-void 
-Amplifier::handleDecoderIRQ() {
-    AMP_DEBUG_I( "Decoder Interrupt" );  
-  //  mDolbyDecoder->handleInterrupt( mAudioQueue );
-}
-
 void
 Amplifier::handlePowerButtonPress() {
     AMP_DEBUG_I( "Power button pressed" );
@@ -628,14 +577,6 @@ Amplifier::handlePowerButtonPress() {
 void 
 Amplifier::handleInputButtonPress() {
     AMP_DEBUG_I( "Input button pressed" );
-
-    {
-        ScopedLock lock( mStateMutex );
-
-        mState.mEnhancement = !mState.mEnhancement;
-
-        mAudioQueue->add( Message::MSG_AUDIO_SET_ENHANCEMENT, mState.mEnhancement );
-    }
 }
 
 void 
@@ -645,15 +586,11 @@ Amplifier::handleVolumeButtonPress() {
 
 
 void 
-Amplifier::startDigitalAudio() {
+Amplifier::startAudio() {
     taskDelayInMs( 10 );
 
     // Dolby Decoder is muted, but running, so it's outputting zeros and a clock to the DAC
     AMP_DEBUG_I( "Starting SPDIF/DAC initialization" );
-
-    // enable CS8416
-    gpio_set_level( PIN_CS8416_RESET, 1 );
-    taskDelayInMs( 10 );
 
     mSpdifTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
 
@@ -661,7 +598,7 @@ Amplifier::startDigitalAudio() {
 
     AMP_DEBUG_I( "Starting SPDIF initialization" );
 
-    mSPDIF->init();
+    //mSPDIF->init();
 
     AMP_DEBUG_I( "Starting DAC" );
 
@@ -674,90 +611,78 @@ Amplifier::startDigitalAudio() {
     }
 
     // set the proper input channel
-    AmplifierState state = getCurrentState();
-    mSPDIF->setInput( state.mInput );
+    audioChangeInput();
 
     AMP_DEBUG_I( "Telling SPDIF to run" );
     // start decoding
-    mSPDIF->run();
+   // mSPDIF->run();
 
-    taskDelayInMs( 10 );
-
-    // AMP_DEBUG_I( "Enabling the DAC" );
-   // mDAC->enable( true );
-
-    mDigitalAudioStarted = true;
 }
 
 void 
-Amplifier::stopDigitalAudio() {
+Amplifier::audioChangeInput() {
+    // change the input to what is specified in the configuration
+    AmplifierState state = getCurrentState();
+    AMP_DEBUG_I( "Attemping to change audio input" );
+
+    if ( state.mCurrentInput.get() ) {
+        if( mState.mCurrentInput->mType == Input::INPUT_TYPE_ANALOG ) {
+            // analog input
+            if ( mState.mCurrentInput->mPort == Input::INPUT_PORT_RCA ) {
+                AMP_DEBUG_I( "...Setting RCA input to %d", mState.mCurrentInput->mID );
+                // rca input
+                mChannelSel->selectChannel( mState.mCurrentInput->mID + 1 );
+            }
+        } else if ( mState.mCurrentInput->mType == Input::INPUT_TYPE_DIGITAL ) {
+            // deselect all relays to save power
+            mChannelSel->selectChannel( 0 );
+            
+            if ( mState.mCurrentInput->mPort == Input::INPUT_PORT_SPDIF ) {
+                AMP_DEBUG_I( "...Setting SPDIF input to %d", mState.mCurrentInput->mID );
+
+                mDigitalReceiver->setInput( mState.mCurrentInput->mID );
+            }
+        }
+    }
+}
+
+void 
+Amplifier::stopAudio() {
     AMP_DEBUG_I( "Stopping SPDIF/DAC" );
 
     mTimer->cancelTimer( mSpdifTimerID );
     mSpdifTimerID = 0;
-
-   // mDAC->enable( false );
-    mSPDIF->run( false );
-
-    // disable CS8416
-    gpio_set_level( PIN_CS8416_RESET, 0 );
-
-    mDigitalAudioStarted = false;
 }
 
 void 
 Amplifier::handleAudioThread() {
     AMP_DEBUG_I( "Starting Audio Thread" );
-
-    // enable reset of the CS8416
-    gpio_set_level( PIN_CS8416_RESET, 0 );
-
     taskDelayInMs( 10 );
 
-    // Channel Selector is now muted - need to umuted when audio is ready to go
-    mChannelSel->init();
-    mChannelSel->mute( true );
-
-    AMP_DEBUG_I( "Relay active" );
-
-    gpio_set_level( PIN_RELAY, 1 );
-
-    taskDelayInMs( 500 );
+    mCurrentInput = 0;
+    mState.mCurrentInput = mAllInputs[ mCurrentInput ];
 
     AMP_DEBUG_I( "Decoder set into active mode" );   
 
      // Initial volume, 0-79
     AmplifierState state = getCurrentState();
 
-    AMP_DEBUG_I( "Setting involumeput" );
+    AMP_DEBUG_I( "Setting volume" );
 
     mMasterVolume->setAttenuation( state.mCurrentAttenuation );
-    mChannelSel->setEnhancement( state.mEnhancement );
 
     AMP_DEBUG_I( "Setting input" );
-  
-    if ( state.mInput == AmplifierState::INPUT_SPDIF_1 || state.mInput == AmplifierState::INPUT_SPDIF_2 || state.mInput == AmplifierState::INPUT_SPDIF_3 ) {
-        mSPDIF->setInput( state.mInput );
-        mChannelSel->setInput( ChannelSel::INPUT_STEREO_1 ); 
 
-        startDigitalAudio();
-    } else {
-        mChannelSel->setInput( state.mInput ); 
-    }
 
     mI2C->scanBus();
 
     asyncUpdateDisplay();
-
-    mChannelSel->mute( false );
-    AMP_DEBUG_I( "Channel selector un-muted" );
 
     // Enable the DACs
     for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
         mDAC[i]->enable( true );
     }
 
-    
     // Set to playing status
     changeAmplifierState( AmplifierState::STATE_PLAYING );
 
@@ -766,20 +691,10 @@ Amplifier::handleAudioThread() {
         while ( mAudioQueue->waitForMessage( msg, 5 ) ) {
             switch( msg.mMessageType ) {
                 case Message::MSG_AUDIO_RESTART:
-                    {
-                        AmplifierState state = getCurrentState();
-                        if ( state.mInput == AmplifierState::INPUT_SPDIF_1 || state.mInput == AmplifierState::INPUT_SPDIF_2 || state.mInput == AmplifierState::INPUT_SPDIF_3 ) {
-                            startDigitalAudio();
-                        }
-                    }
+                    startAudio();
                     break;
                 case Message::MSG_AUDIO_SHUTDOWN:
-                    {
-                        AmplifierState state = getCurrentState();
-                        if ( state.mInput == AmplifierState::INPUT_SPDIF_1 || state.mInput == AmplifierState::INPUT_SPDIF_2 || state.mInput == AmplifierState::INPUT_SPDIF_3 ) {
-                            stopDigitalAudio();
-                        }
-                    }
+                    stopAudio();
                     break;
                 case Message::MSG_VOLUME_SET:
                     AMP_DEBUG_I( "Setting pending audio volume to %lu", msg.mParam );
@@ -788,70 +703,20 @@ Amplifier::handleAudioThread() {
                     
                     break;
                 case Message::MSG_INPUT_SET:
-                    AMP_DEBUG_I( "Setting audio input to %lu", msg.mParam );
+                    AMP_DEBUG_I( "Setting audio input" );
 
-                    if ( msg.mParam != AmplifierState::INPUT_SPDIF_1 && msg.mParam != AmplifierState::INPUT_SPDIF_2 && msg.mParam != AmplifierState::INPUT_SPDIF_3 ) {
-                        // We are in Dolby, but moving away, so we need to shut down the digital audio
-                        AMP_DEBUG_I( "Stopping Digital Audio" );
-                        stopDigitalAudio();
+                    AMP_DEBUG_E( "Need to do actual audio input selection here" );
 
-                        // set it to proper value
-                        mChannelSel->setInput( msg.mParam );
-                    } else if ( msg.mParam == AmplifierState::INPUT_SPDIF_1 || msg.mParam == AmplifierState::INPUT_SPDIF_2 || msg.mParam == AmplifierState::INPUT_SPDIF_3  ) {
-                        // We need to start up the Dolby digital decoder
-                        AMP_DEBUG_I( "Starting Digital Audio" );
-                        mSPDIF->setInput( msg.mParam );
-                        
-                        startDigitalAudio();
-
-                        // All SPDIF goes into the stereo 1 input for now
-                        mChannelSel->setInput( ChannelSel::INPUT_STEREO_1 );
-                    }
-                    
+                    //mChannelSel->setInput( ChannelSel::INPUT_STEREO_1 );
                     break;
                 case Message::MSG_TIMER: 
                     if ( msg.mParam == mSpdifTimerID ) {
-                          if ( mDigitalAudioStarted  ) {
-                            // let's scan the SPDIF and see what the sampling rate is
-                            if ( mSPDIF->hasLoopLock() ) {
-                                AMP_DEBUG_I( "Has loop lock, free memory is %lu", esp_get_free_heap_size() );
-
-                                bool changed = false;
-
-                                AmplifierState state = getCurrentState();
-                                uint16_t samplingRate = mSPDIF->getSamplingRate();
-                                uint16_t bitDepth = mSPDIF->getBitDepth();
-
-                                {
-                                    ScopedLock lock( mStateMutex );    
-
-                                    AMP_DEBUG_I( "Sampling rate is [%d]", samplingRate );
-                                    if ( samplingRate != state.mSamplingRate ) {
-                                        mState.mSamplingRate = samplingRate;
-                                        changed = true;
-                                    }
-
-                                   
-                                    AMP_DEBUG_I( "Bit depth is [%d]", bitDepth );
-                                    if ( bitDepth != state.mBitDepth ) {
-                                    
-                                        mState.mBitDepth = bitDepth;
-                                        changed = true;
-                                    }
-                                }
-
-                                // update the display from the display thread
-                                if ( changed ) {
-                                    asyncUpdateDisplay();
-                                }
-                            } else {
-                                AMP_DEBUG_I( "SPDIF has lost sync, error byte is [%#02x]", mSPDIF->getErrorInfo() );
-                            }
-                        }                  
+                               
                     } else if ( msg.mParam == mAudioTimerID ) {
                         // we are on the audio timer thread
                         if ( mPendingVolumeChange ) {
                             AMP_DEBUG_I( "Actually setting pending audio volume to %lu", mPendingVolume );
+
                             mMasterVolume->setAttenuation( mPendingVolume );
                         }
                     } 
@@ -863,12 +728,6 @@ Amplifier::handleAudioThread() {
                         mState.mSamplingRate = msg.mParam;
                     }
 
-                    asyncUpdateDisplay();
-                    break;
-                case Message::MSG_AUDIO_SET_ENHANCEMENT:
-                    AMP_DEBUG_I( "Actually setting enhancement to %lu", msg.mParam );
-                    mChannelSel->setEnhancement( msg.mParam );
-                    
                     asyncUpdateDisplay();
                     break;
                 default:
@@ -956,22 +815,6 @@ Amplifier::setupWifi() {
     mDNS = MDNSPtr( new MDNS() );
 
     esp_wifi_start();
-
-   // Bluetooth::instance().init();
-
-    // Bluetooth
-    /*
-    uint32_t ret;
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init( &bt_cfg );
-    ret = esp_bt_controller_enable( ESP_BT_MODE_BLE );
-    ret = esp_bluedroid_init();
-    ret = esp_bluedroid_enable();
-    ret = esp_ble_gatts_register_callback(gatts_callback);
-    ret = esp_ble_gap_register_callback(gap_callback);
-    ret = esp_ble_gatts_app_register( 0x01 );
-    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(512);
-    */
 }
 
 void 
@@ -1041,11 +884,6 @@ Amplifier::handleRadioThread() {
 }
 
 void 
-Decoder_ISR( void *arg ) {
-    (( Amplifier * )arg)->_handleDecoderISR();
-}
-
-void 
 Power_Button_ISR( void *arg ) {
     (( Amplifier * )arg)->_handlePowerButtonISR();
 }
@@ -1068,11 +906,6 @@ Input_Button_ISR( void *arg ) {
 void
 Input_Button_Encoder_ISR( void *arg ) {
     (( Amplifier * )arg)->_handleInputButtonEncoderISR();
-}
-
-void 
-Amplifier::_handleDecoderISR() {
-    mAmplifierQueue->addFromISR( Message::MSG_DECODER_IRQ );
 }
 
 void 
