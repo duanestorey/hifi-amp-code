@@ -165,13 +165,18 @@ Amplifier::init() {
     AMP_DEBUG_I( "Setting up LCD display" );
     mLCD = LCDPtr( new LCD( 0x27, mI2C ) );
 
+    mDiagnostics = DiagnosticsPtr( new Diagnostics() );
+
     // Setup temperature sensors
     AMP_DEBUG_I( "Setting up temperature sensors" );
-    mMicroprocessorTemp = TempSensorPtr( new TMP100( 0x48, mI2C ) );
+
+    mDiagnostics->addTemperatureSensor( "CPU", TempSensorPtr( new TMP100( 0x48, mI2C ) ) );
+    mDiagnostics->addTemperatureSensor( "PSU", TempSensorPtr( new TMP100( 0x50, mI2C ) ) );
+    mDiagnostics->addTemperatureSensor( "LEFT", TempSensorPtr( new TMP100( 0x49, mI2C ) ) );
+    mDiagnostics->addTemperatureSensor( "RIGHT", TempSensorPtr( new TMP100( 0x50, mI2C ) ) );
 
     // setup channel selector
     AMP_DEBUG_I( "Setting up channel selectors" );
-   // mChannelSel = new ChannelSel_AX2358( 0x4a, mI2C );
     mChannelSel = AnalogChannelSelectorPtr( new AnalogChannelSelector( mI2C, mPinManager ) );
 
     AMP_DEBUG_I( "Setting up digital receiver" );
@@ -181,13 +186,15 @@ Amplifier::init() {
     AMP_DEBUG_I( "Setting up DACs" );
     for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
         mDAC[i] = DACPtr( new DAC_PCM5142( 0x4c + i, mI2C ) );
+        mDAC[i]->init();
+        mDAC[i]->setFormat( DAC::FORMAT_I2S );
+
         mMasterVolume->addForControl( std::dynamic_pointer_cast<Volume>( mDAC[i] ) );
     }
 
     // Setup digital inputs
     AMP_DEBUG_I( "Setting up digital transceiver" );
     mDigitalReceiver->init();
-  //  mSPDIF = new CS8416( 0x10, mI2C );
 
     AMP_DEBUG_W( "TODO: Activate button light here" );
 
@@ -280,7 +287,7 @@ Amplifier::updateDisplay() {
             sprintf( s, "%-12s", "Starting");
             break;
         case AmplifierState::STATE_PLAYING:
-            sprintf( s, "%-12s%7.1fC", "Playing", mMicroprocessorTemp->readTemperature() );
+            sprintf( s, "%-12s%7.1fC", "Playing", mDiagnostics->getTemperature( "CPU" ) );
             break;
         case AmplifierState::STATE_MUTED:
             sprintf( s, "%-12s", "Muted" );
@@ -460,7 +467,7 @@ Amplifier::handleAmplifierThread() {
                     break;
                 case Message::MSG_TIMER:
                     if ( msg.mParam == mTimerID ) {
-                        AMP_DEBUG_I( "In Periodic Timer Event, Temp is %0.2f", mMicroprocessorTemp->readTemperature() );
+                        AMP_DEBUG_I( "In Periodic Timer Event, Temp is %0.2f", mDiagnostics->getTemperature( "CPU" ) );
                         asyncUpdateDisplay();
                     } else if ( msg.mParam == mButtonTimerID ) {
                         // Process all button ticks
@@ -584,6 +591,32 @@ Amplifier::handleVolumeButtonPress() {
     AMP_DEBUG_I( "Volume button pressed" );
 }
 
+void 
+Amplifier::audioChangeInput() {
+    // change the input to what is specified in the configuration
+    InputPtr currentInput = getCurrentInput();
+    AMP_DEBUG_I( "Attemping to change audio input" );
+
+    if ( currentInput.get() ) {
+        if( currentInput->mType == Input::INPUT_TYPE_ANALOG ) {
+            // analog input
+            if ( currentInput->mPort == Input::INPUT_PORT_RCA ) {
+                AMP_DEBUG_I( "...Setting RCA input to %d", mState.mCurrentInput->mID );
+                // rca input
+                mChannelSel->selectChannel( currentInput->mID + 1 );
+            }
+        } else if ( currentInput->mType == Input::INPUT_TYPE_DIGITAL ) {
+            // deselect all relays to save power
+            mChannelSel->selectChannel( 0 );
+            
+            if ( currentInput->mPort == Input::INPUT_PORT_SPDIF ) {
+                AMP_DEBUG_I( "...Setting SPDIF input to %d", currentInput->mID );
+
+                mDigitalReceiver->setInput( currentInput->mID );
+            }
+        }
+    }
+}
 
 void 
 Amplifier::startAudio() {
@@ -598,13 +631,13 @@ Amplifier::startAudio() {
     AMP_DEBUG_I( "Setting previous volume" );    
     mMasterVolume->setAttenuation( mState.mCurrentAttenuation );
 
-    AMP_DEBUG_I( "Unmuting outputs" );
-    mMasterVolume->mute( false );
-
-    // Enable the DACs
+    AMP_DEBUG_I( "Enabling DACs" );
     for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
         mDAC[i]->enable( true );
     }
+
+    AMP_DEBUG_I( "Unmuting outputs" );
+    mMasterVolume->mute( false );
 
     AMP_DEBUG_I( "Switching to PLAY state" );
     changeAmplifierState( AmplifierState::STATE_PLAYING );
@@ -614,38 +647,14 @@ Amplifier::startAudio() {
 }
 
 void 
-Amplifier::audioChangeInput() {
-    // change the input to what is specified in the configuration
-    AmplifierState state = getCurrentState();
-    AMP_DEBUG_I( "Attemping to change audio input" );
-
-    if ( state.mCurrentInput.get() ) {
-        if( mState.mCurrentInput->mType == Input::INPUT_TYPE_ANALOG ) {
-            // analog input
-            if ( mState.mCurrentInput->mPort == Input::INPUT_PORT_RCA ) {
-                AMP_DEBUG_I( "...Setting RCA input to %d", mState.mCurrentInput->mID );
-                // rca input
-                mChannelSel->selectChannel( mState.mCurrentInput->mID + 1 );
-            }
-        } else if ( mState.mCurrentInput->mType == Input::INPUT_TYPE_DIGITAL ) {
-            // deselect all relays to save power
-            mChannelSel->selectChannel( 0 );
-            
-            if ( mState.mCurrentInput->mPort == Input::INPUT_PORT_SPDIF ) {
-                AMP_DEBUG_I( "...Setting SPDIF input to %d", mState.mCurrentInput->mID );
-
-                mDigitalReceiver->setInput( mState.mCurrentInput->mID );
-            }
-        }
-    }
-}
-
-void 
 Amplifier::stopAudio() {
     AMP_DEBUG_I( "Stopping Audio" );
 
     mTimer->cancelTimer( mSpdifTimerID );
     mSpdifTimerID = 0;
+
+    AMP_DEBUG_I( "Muting volume" );
+    mMasterVolume->mute( true );
 
     // Disable the DACs
     AMP_DEBUG_I( "Disabling DACs" );
@@ -653,11 +662,7 @@ Amplifier::stopAudio() {
         mDAC[i]->enable( false );
     }
 
-    AMP_DEBUG_I( "Muting volume" );
-    mMasterVolume->mute( true );
-
     AMP_DEBUG_I( "Switching to SLEEP state" );
-
     changeAmplifierState( AmplifierState::STATE_SLEEPING );
 }
 
@@ -669,16 +674,10 @@ Amplifier::handleAudioThread() {
 
     // Set the initial channel input to the first slot
     {
-        ScopedLock lock( mMutex );
+        ScopedLock lock( mStateMutex );
 
         mCurrentInput = 0;
         mState.mCurrentInput = mAllInputs[ mCurrentInput ];
-    }
-
-    // Setup output DACs
-    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
-        mDAC[i]->init();
-        mDAC[i]->setFormat( DAC::FORMAT_I2S );
     }
 
     startAudio();

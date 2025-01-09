@@ -30,6 +30,7 @@ set(COMPONENT_SRCS
     "analog-channel-selector.cpp"
     "digital-receiver.cpp"
     "adc-pcm1863.cpp"
+    "diagnostics.cpp"
 )
 set(COMPONENT_ADD_INCLUDEDIRS)
 

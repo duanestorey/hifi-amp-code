@@ -24,6 +24,7 @@
 #include "digital-receiver.h"
 #include "mdns-net.h"
 #include "input.h"
+#include "diagnostics.h"
 #include <vector>
 
 typedef std::vector<InputPtr> InputVector;
@@ -91,8 +92,7 @@ protected:
     MDNSPtr mDNS;
     AnalogChannelSelectorPtr mChannelSel;
     DigitalReceiverPtr mDigitalReceiver;
-
-    TempSensorPtr mMicroprocessorTemp;
+    DiagnosticsPtr mDiagnostics;
 
     Encoder mVolumeEncoder;
     Encoder mInputEncoder;
