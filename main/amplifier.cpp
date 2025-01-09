@@ -587,35 +587,29 @@ Amplifier::handleVolumeButtonPress() {
 
 void 
 Amplifier::startAudio() {
-    taskDelayInMs( 10 );
-
-    // Dolby Decoder is muted, but running, so it's outputting zeros and a clock to the DAC
-    AMP_DEBUG_I( "Starting SPDIF/DAC initialization" );
+    AMP_DEBUG_I( "Starting audio" );
 
     mSpdifTimerID = mTimer->setTimer( 1000, mAudioQueue, true );
-
-    // Initialize SPDIF stream, but don't run
-
-    AMP_DEBUG_I( "Starting SPDIF initialization" );
-
-    //mSPDIF->init();
-
-    AMP_DEBUG_I( "Starting DAC" );
-
-    mMasterVolume->setAttenuation( mState.mCurrentAttenuation );
     
-    // Setup output DACs
-    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
-        mDAC[i]->init();
-        mDAC[i]->setFormat( DAC::FORMAT_I2S );
-    }
-
     // set the proper input channel
+    AMP_DEBUG_I( "Restoring inputs" );
     audioChangeInput();
 
-    AMP_DEBUG_I( "Telling SPDIF to run" );
-    // start decoding
-   // mSPDIF->run();
+    AMP_DEBUG_I( "Setting previous volume" );    
+    mMasterVolume->setAttenuation( mState.mCurrentAttenuation );
+
+    AMP_DEBUG_I( "Unmuting outputs" );
+    mMasterVolume->mute( false );
+
+    // Enable the DACs
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i]->enable( true );
+    }
+
+    AMP_DEBUG_I( "Switching to PLAY state" );
+    changeAmplifierState( AmplifierState::STATE_PLAYING );
+
+    asyncUpdateDisplay();
 
 }
 
@@ -648,43 +642,46 @@ Amplifier::audioChangeInput() {
 
 void 
 Amplifier::stopAudio() {
-    AMP_DEBUG_I( "Stopping SPDIF/DAC" );
+    AMP_DEBUG_I( "Stopping Audio" );
 
     mTimer->cancelTimer( mSpdifTimerID );
     mSpdifTimerID = 0;
+
+    // Disable the DACs
+    AMP_DEBUG_I( "Disabling DACs" );
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i]->enable( false );
+    }
+
+    AMP_DEBUG_I( "Muting volume" );
+    mMasterVolume->mute( true );
+
+    AMP_DEBUG_I( "Switching to SLEEP state" );
+
+    changeAmplifierState( AmplifierState::STATE_SLEEPING );
 }
 
 void 
 Amplifier::handleAudioThread() {
     AMP_DEBUG_I( "Starting Audio Thread" );
-    taskDelayInMs( 10 );
-
-    mCurrentInput = 0;
-    mState.mCurrentInput = mAllInputs[ mCurrentInput ];
-
-    AMP_DEBUG_I( "Decoder set into active mode" );   
-
-     // Initial volume, 0-79
-    AmplifierState state = getCurrentState();
-
-    AMP_DEBUG_I( "Setting volume" );
-
-    mMasterVolume->setAttenuation( state.mCurrentAttenuation );
-
-    AMP_DEBUG_I( "Setting input" );
-
-
+    
     mI2C->scanBus();
 
-    asyncUpdateDisplay();
+    // Set the initial channel input to the first slot
+    {
+        ScopedLock lock( mMutex );
 
-    // Enable the DACs
-    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
-        mDAC[i]->enable( true );
+        mCurrentInput = 0;
+        mState.mCurrentInput = mAllInputs[ mCurrentInput ];
     }
 
-    // Set to playing status
-    changeAmplifierState( AmplifierState::STATE_PLAYING );
+    // Setup output DACs
+    for ( int i = 0; i < AMP_DAC_TOTAL_NUM; i++ ) {
+        mDAC[i]->init();
+        mDAC[i]->setFormat( DAC::FORMAT_I2S );
+    }
+
+    startAudio();
 
     Message msg;
     while( true ) {
